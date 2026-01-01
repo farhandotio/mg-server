@@ -1,214 +1,173 @@
-import mongoose from "mongoose";
-import productModel from "../models/product.model.js";
-import reviewModel from "../models/review.model.js";
+import reviewModel from '../models/review.model.js';
+import orderModel from '../models/order.model.js';
+import mongoose from 'mongoose';
 
-// ---------------- Add Review ----------------
-const addReview = async (req, res) => {
+/** -----------------------------------------------------------
+ * USER CONTROLLERS
+ * ----------------------------------------------------------- */
+
+// ১. Add Review (Verified Purchase Logic)
+export const addReview = async (req, res) => {
   try {
     const { productId, rating, comment } = req.body;
-    const user = req.user;
+    const userId = req.user._id;
 
-    if (!user || !productId || !rating) {
+    const hasOrdered = await orderModel.findOne({
+      user: userId,
+      'orderItems.product': productId,
+      orderStatus: 'Delivered',
+    });
+
+    if (!hasOrdered) {
       return res
-        .status(400)
-        .json({ success: false, message: "Missing required fields" });
+        .status(403)
+        .json({ success: false, message: 'Purchase the product to leave a review.' });
+    }
+
+    const alreadyReviewed = await reviewModel.findOne({ productId, userId });
+    if (alreadyReviewed) {
+      return res.status(400).json({ success: false, message: 'You already reviewed this product' });
     }
 
     const review = await reviewModel.create({
       productId,
-      userId: user.id,
-      rating,
+      userId,
+      rating: Number(rating),
       comment,
+      isVerifiedPurchase: true,
+      status: 'Approved', // প্রোডাকশনে 'Pending' রাখতে পারেন মডারেশনের জন্য
     });
 
-    // Update product stats
-    const stats = await reviewModel.aggregate([
-      { $match: { productId: new mongoose.Types.ObjectId(productId) } },
-      {
-        $group: {
-          _id: "$productId",
-          averageRating: { $avg: "$rating" },
-          reviewCount: { $sum: 1 },
-        },
-      },
-    ]);
-
-    if (stats.length > 0) {
-      await productModel.findByIdAndUpdate(productId, {
-        averageRating: stats[0].averageRating,
-        reviewCount: stats[0].reviewCount,
-      });
-    }
-
-    // Populate user in response
-    await review.populate("userId", "fullname email role");
-
-    res.status(201).json({ success: true, review });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.status(201).json({ success: true, message: 'Review submitted!', review });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ---------------- Get Reviews for a Product ----------------
-const getProductReviews = async (req, res) => {
+// ২. Update Review (User can edit their own review)
+export const updateReview = async (req, res) => {
   try {
-    const reviews = await reviewModel
-      .find({ productId: req.params.productId })
-      .populate("userId", "fullname email role")
-      .sort({ createdAt: -1 });
+    const { rating, comment } = req.body;
+    const review = await reviewModel.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { rating, comment, status: 'Approved' },
+      { new: true, runValidators: true }
+    );
 
-    res.status(200).json({ success: true, reviews });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    if (!review) return res.status(404).json({ message: 'Review not found or unauthorized' });
+    res.json({ success: true, message: 'Review updated!', review });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ---------------- Get All Reviews (Admin Panel) ----------------
-const getAllReviews = async (req, res) => {
-  try {
-    const reviews = await reviewModel
-      .find()
-      .populate("userId", "fullname email role")
-      .populate("productId", "title")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({ success: true, reviews });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
-  }
-};
-
-// ---------------- Update Review ----------------
-const updateReview = async (req, res) => {
+// ৩. Toggle Helpful Vote
+export const toggleHelpful = async (req, res) => {
   try {
     const review = await reviewModel.findById(req.params.id);
-    if (!review)
-      return res
-        .status(404)
-        .json({ success: false, message: "Review not found" });
+    if (!review) return res.status(404).json({ message: 'Review not found' });
 
-    // ensure both sides are strings when comparing
-    const reviewOwnerId = review.userId?.toString();
-    const requesterId = req.user?.id?.toString() || req.user?._id?.toString();
-
-    if (reviewOwnerId !== requesterId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Not authorized" });
-    }
-
-    // Only allow updating rating and comment
-    const { rating, comment } = req.body;
-    let changed = false;
-    if (rating !== undefined) {
-      // optional: validate rating range here
-      review.rating = rating;
-      changed = true;
-    }
-    if (comment !== undefined) {
-      review.comment = comment;
-      changed = true;
-    }
-
-    if (!changed) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Nothing to update" });
+    // লাইক লজিক (একবার ক্লিক করলে বাড়বে, আবার করলে কমবে)
+    const isHelpful = review.helpfulVotes.includes(req.user._id);
+    if (isHelpful) {
+      review.helpfulVotes.pull(req.user._id);
+    } else {
+      review.helpfulVotes.push(req.user._id);
     }
 
     await review.save();
-
-    // Recompute product stats
-    const stats = await reviewModel.aggregate([
-      { $match: { productId: new mongoose.Types.ObjectId(review.productId) } },
-      {
-        $group: {
-          _id: "$productId",
-          averageRating: { $avg: "$rating" },
-          reviewCount: { $sum: 1 },
-        },
-      },
-    ]);
-
-    await productModel.findByIdAndUpdate(review.productId, {
-      averageRating: stats.length ? stats[0].averageRating : 0,
-      reviewCount: stats.length ? stats[0].reviewCount : 0,
-    });
-
-    // Populate user info and return only needed fields
-    await review.populate("userId", "fullname email role");
-    const response = {
-      _id: review._id,
-      rating: review.rating,
-      comment: review.comment,
-      createdAt: review.createdAt,
-      user: review.userId, // populated
-    };
-
-    res.status(200).json({ success: true, review: response });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.json({ success: true, helpfulCount: review.helpfulVotes.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ---------------- Delete Review ----------------
-const deleteReview = async (req, res) => {
+/** -----------------------------------------------------------
+ * PUBLIC CONTROLLERS
+ * ----------------------------------------------------------- */
+
+// ৪. Get Product Reviews (With Pagination)
+export const getProductReviews = async (req, res) => {
+  try {
+    const { page = 1, limit = 5 } = req.query;
+    const reviews = await reviewModel
+      .find({ productId: req.params.productId, status: 'Approved' })
+      .populate('userId', 'name avatar')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await reviewModel.countDocuments({
+      productId: req.params.productId,
+      status: 'Approved',
+    });
+
+    res.json({ success: true, total, reviews });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ৫. Get Review Stats (Rating Summary)
+export const getReviewStats = async (req, res) => {
+  try {
+    const stats = await reviewModel.aggregate([
+      {
+        $match: {
+          productId: new mongoose.Types.ObjectId(req.params.productId),
+          status: 'Approved',
+        },
+      },
+      { $group: { _id: '$rating', count: { $sum: 1 } } },
+    ]);
+    res.json({ success: true, stats });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/** -----------------------------------------------------------
+ * ADMIN CONTROLLERS
+ * ----------------------------------------------------------- */
+
+// ৬. Get All Reviews (Admin Management)
+export const getAllReviewsAdmin = async (req, res) => {
+  try {
+    const reviews = await reviewModel
+      .find()
+      .populate('productId', 'title')
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, reviews });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ৭. Update Review Status (Moderate)
+export const updateReviewStatus = async (req, res) => {
+  try {
+    const { status } = req.body; // Approved or Rejected
+    const review = await reviewModel.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json({ success: true, message: `Review ${status}`, review });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ৮. Delete Review
+export const deleteReview = async (req, res) => {
   try {
     const review = await reviewModel.findById(req.params.id);
-    if (!review) return res.status(404).json({ message: "Review not found" });
+    if (!review) return res.status(404).json({ message: 'Review not found' });
 
-    const productId = review.productId;
+    if (review.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
 
-    await review.deleteOne(); // safer than .remove()
-
-    // Update product stats
-    const stats = await reviewModel.aggregate([
-      { $match: { productId: new mongoose.Types.ObjectId(productId) } },
-      {
-        $group: {
-          _id: "$productId",
-          averageRating: { $avg: "$rating" },
-          reviewCount: { $sum: 1 },
-        },
-      },
-    ]);
-
-    await productModel.findByIdAndUpdate(productId, {
-      averageRating: stats.length ? stats[0].averageRating : 0,
-      reviewCount: stats.length ? stats[0].reviewCount : 0,
-    });
-
-    res.status(200).json({ success: true, message: "Review deleted" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    await reviewModel.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Review deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
-};
-
-// ---------------- Get Single Review ----------------
-const getReviewById = async (req, res) => {
-  try {
-    const review = await reviewModel
-      .findById(req.params.id)
-      .populate("userId", "fullname email role");
-    if (!review) return res.status(404).json({ message: "Review not found" });
-
-    res.status(200).json({ success: true, review });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server Error" });
-  }
-};
-
-export {
-  addReview,
-  deleteReview,
-  getAllReviews,
-  getProductReviews,
-  updateReview,
-  getReviewById,
 };

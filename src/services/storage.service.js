@@ -1,5 +1,5 @@
-import ImageKit from "imagekit";
-import { v4 as uuidv4 } from "uuid";
+import ImageKit from 'imagekit';
+import { v4 as uuidv4 } from 'uuid';
 
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
@@ -7,23 +7,38 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
 });
 
-async function uploadFile(file, fileName, folder = "/DigitalHat") {
+
+export const uploadFile = async (fileBuffer, folder = '/DigitalHat') => {
   try {
+    if (!fileBuffer) throw new Error('No file buffer provided');
+
+    const fileName = `${uuidv4()}-${Date.now()}.jpg`;
+
     const res = await imagekit.upload({
-      file,
-      fileName: fileName || `${uuidv4()}.jpg`,
-      folder,
+      file: fileBuffer,
+      fileName: fileName,
+      folder: folder,
+      useUniqueFileName: true,
     });
 
     return {
       url: res.url,
+      fileId: res.fileId, 
       thumbnail: res.thumbnailUrl || res.url,
-      id: res.fileId,
     };
   } catch (error) {
-    console.error("Image upload failed:", error);
-    throw new Error("Image upload failed");
+    console.error('ImageKit Upload Error:', error.message);
+    throw new Error('Failed to upload image to cloud storage');
   }
-}
+};
 
-export default uploadFile
+
+export const deleteFile = async (fileId) => {
+  try {
+    if (!fileId) return;
+    await imagekit.deleteFile(fileId);
+    return { success: true };
+  } catch (error) {
+    console.error('ImageKit Delete Error:', error.message);
+  }
+};

@@ -1,15 +1,15 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const reviewSchema = new mongoose.Schema(
   {
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "product",
+      ref: 'Product',
       required: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
+      ref: 'User',
       required: true,
     },
     rating: {
@@ -20,11 +20,29 @@ const reviewSchema = new mongoose.Schema(
     },
     comment: {
       type: String,
+      required: [true, 'Comment cannot be empty'],
+    },
+    images: [
+      {
+        url: String,
+        fileId: String,
+      },
+    ],
+    isVerifiedPurchase: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ['Pending', 'Approved', 'Rejected'],
+      default: 'Approved',
     },
   },
   { timestamps: true }
 );
 
-const reviewModel = mongoose.model("review", reviewSchema);
+// একই ইউজার যেন একই প্রোডাক্টে বারবার রিভিউ দিতে না পারে (Unique Index)
+reviewSchema.index({ productId: 1, userId: 1 }, { unique: true });
 
+const reviewModel = mongoose.model('Review', reviewSchema);
 export default reviewModel;

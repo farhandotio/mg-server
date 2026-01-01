@@ -1,47 +1,46 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const addressShema = new mongoose.Schema({
+const addressSchema = new mongoose.Schema({
   phone: String,
   street: String,
   city: String,
   state: String,
   zip: String,
   country: String,
-  isDefalt: {
+  isDefault: {
     type: Boolean,
     default: false,
   },
 });
 
-const userSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  fullname: {
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-  },
-  googleId: { type: String },
-  password: {
-    type: String,
-    required: function () {
-      return !this.googleId;
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
     },
-    select: false,
+    fullname: {
+      type: String,
+      required: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+    addresses: [addressSchema],
+    passwordResetToken: String,
+    passwordResetExpires: Date,
   },
-  role: {
-    type: String,
-    enum: ["user", "admin"],
-    default: "user",
-  },
-  addresses: [addressShema],
+  { timestamps: true }
+);
 
-  passwordResetToken: String,
-  passwordResetExpires: Date,
-});
-
-const userModel = mongoose.model("user", userSchema);
-
+const userModel = mongoose.model('User', userSchema);
 export default userModel;

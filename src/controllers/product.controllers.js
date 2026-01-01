@@ -1,339 +1,224 @@
-import productModel from "../models/product.model.js";
-import uploadFile from "../services/storage.service.js";
-import slugify from "slugify";
+import productModel from '../models/product.model.js';
+import { uploadFile, deleteFile } from '../services/storage.service.js';
+import slugify from 'slugify';
 
-async function create(req, res) {
+// ১. CREATE PRODUCT (Admin Only)
+export const createProduct = async (req, res) => {
   try {
     const {
       title,
       description,
-      priceAmount,
-      priceCurrency = "BDT",
-      offer,
-      offerDeadline,
-      productType = "Standard",
-      isAffiliate = false,
-      categoryName,
-      categorySlug,
-      brand,
-      isActive = true,
-      stock = 0,
-    } = req.body;
-
-    // Basic required checks
-    if (!title || !priceAmount || !categoryName) {
-      return res.status(400).json({
-        success: false,
-        message: "title, priceAmount, and categoryName are required",
-      });
-    }
-
-    // Build price object
-    const price = { amount: Number(priceAmount), currency: priceCurrency };
-
-    // Category
-    const category = {
-      name: categoryName,
-      slug: categorySlug || slugify(categoryName, { lower: true }),
-    };
-
-    // Upload images if any
-    const images = await Promise.all(
-      (req.files || []).map(async (file) => {
-        const uploaded = await uploadFile(file.buffer, file.originalname);
-        return {
-          url: uploaded.url,
-          thumbnailUrl:
-            uploaded.thumbnail || uploaded.thumbnailUrl || uploaded.url,
-          fileId: uploaded.id || uploaded.fileId || null,
-        };
-      })
-    );
-
-    // Prepare product payload
-    const productPayload = {
-      title: title.trim(),
-      description: description || "",
-      price,
-      images,
-      offer,
-      offerDeadline: offerDeadline ? new Date(offerDeadline) : null,
-      productType,
-      isAffiliate: Boolean(isAffiliate),
-      category,
-      brand: brand || "",
-      isActive: Boolean(isActive),
-      stock: Number(stock) || 0,
-      sold: 0,
-      averageRating: 0,
-      reviewCount: 0,
-    };
-
-    const created = await productModel.create(productPayload);
-    return res.status(201).json({ success: true, product: created });
-  } catch (err) {
-    console.error("Create product error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-}
-
-async function update(req, res) {
-  try {
-    const { id } = req.params;
-    const product = await productModel.findById(id);
-
-    if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
-    }
-
-    const {
-      title,
-      description,
-      priceAmount,
-      priceCurrency,
-      offer,
-      offerDeadline,
-      productType,
-      isAffiliate,
-      categoryName,
-      categorySlug,
-      brand,
-      isActive,
+      price, // এটি সরাসরি অবজেক্ট হতে পারে যদি ডাটা ঠিকভাবে পাঠানো হয়
       stock,
+      category,
+      brand,
+      sku,
+      productType,
+      tags,
+      specifications,
     } = req.body;
 
-    const updateData = {};
-
-    // Simple updates
-    if (title) updateData.title = title.trim();
-    if (description) updateData.description = description;
-    if (typeof isAffiliate !== "undefined")
-      updateData.isAffiliate = isAffiliate === "true" || isAffiliate === true;
-    if (typeof isActive !== "undefined")
-      updateData.isActive = isActive === "true" || isActive === true;
-    if (typeof stock !== "undefined") updateData.stock = Number(stock);
-
-    // Price update
-    if (priceAmount) {
-      const parsedPrice = Number(priceAmount);
-      if (isNaN(parsedPrice) || parsedPrice <= 0)
-        return res
-          .status(400)
-          .json({ success: false, message: "priceAmount must be > 0" });
-      updateData.price = {
-        amount: parsedPrice,
-        currency: priceCurrency || product.price.currency,
-      };
-    }
-
-    // Offer update
-    if (offer !== undefined) {
-      const parsedOffer = Number(offer);
-      if (isNaN(parsedOffer) || parsedOffer < 0 || parsedOffer > 100)
-        return res.status(400).json({
-          success: false,
-          message: "Offer must be between 0 and 100",
-        });
-      updateData.offer = parsedOffer;
-    }
-
-    // OfferDeadline
-    if (offerDeadline) {
-      const dt = new Date(offerDeadline);
-      if (isNaN(dt.getTime()) || dt <= new Date())
-        return res.status(400).json({
-          success: false,
-          message: "OfferDeadline must be a valid future date",
-        });
-      updateData.offerDeadline = dt;
-    }
-
-    // ProductType update
-    const ALLOWED_PRODUCT_TYPES = ["Standard", "HotDeals", "Featured"];
-    if (productType) {
-      if (!ALLOWED_PRODUCT_TYPES.includes(productType))
-        return res.status(400).json({
-          success: false,
-          message: `productType must be one of: ${ALLOWED_PRODUCT_TYPES.join(
-            ", "
-          )}`,
-        });
-      updateData.productType = productType;
-    }
-
-    // Category update
-    if (categoryName || categorySlug) {
-      updateData.category = {
-        name: categoryName || product.category.name,
-        slug:
-          categorySlug ||
-          slugify(categoryName || product.category.name, { lower: true }),
-      };
-    }
-
-    // Brand
-    if (brand) updateData.brand = brand;
-
-    // Images update via req.files
-    if (req.files && req.files.length > 0) {
-      const uploadedImages = await Promise.all(
-        req.files.map(async (file) => {
-          const uploaded = await uploadFile(file.buffer, file.originalname);
-          return {
-            url: uploaded.url,
-            thumbnailUrl:
-              uploaded.thumbnail || uploaded.thumbnailUrl || uploaded.url,
-            fileId: uploaded.id || uploaded.fileId || null,
-          };
-        })
-      );
-      // Optionally delete old images from storage here
-      updateData.images = uploadedImages;
-    }
-
-    // Update product in DB
-    const updatedProduct = await productModel.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
-
-    return res.status(200).json({ success: true, product: updatedProduct });
-  } catch (err) {
-    console.error("Update product error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-}
-
-async function fetchAll(req, res) {
-  try {
-    const {
-      page = 1,
-      limit = 20,
-      category,
-      sort,
-      minprice,
-      maxprice,
-      q,
-    } = req.query;
-
-    const filter = {};
-
-    if (q) filter.$text = { $search: q };
-
-    if (category) filter["category.slug"] = category.toLowerCase();
-
-    if (minprice)
-      filter["price.amount"] = {
-        ...filter["price.amount"],
-        $gte: Number(minprice),
-      };
-    if (maxprice)
-      filter["price.amount"] = {
-        ...filter["price.amount"],
-        $lte: Number(maxprice),
-      };
-
-    let query = productModel.find(filter);
-
-    // Sorting
-    if (sort) {
-      const sortObj = {};
-      if (sort === "price") sortObj["price.amount"] = 1;
-      else if (sort === "-price") sortObj["price.amount"] = -1;
-      else if (sort === "newest") sortObj["createdAt"] = -1;
-      query = query.sort(sortObj);
-    } else {
-      query = query.sort({ createdAt: -1 });
-    }
-
-    // Pagination
-    const skip = (Number(page) - 1) * Number(limit);
-    const total = await productModel.countDocuments(filter);
-    const products = await query.skip(skip).limit(Number(limit));
-
-    return res.status(200).json({ success: true, data: products, total });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-}
-
-async function fetchCategories(req, res) {
-  try {
-    const categories = await productModel.aggregate([
-      {
-        $match: {
-          "category.slug": { $exists: true, $ne: "" },
-        },
-      },
-      {
-        $group: {
-          _id: "$category.slug",
-          slug: { $first: "$category.slug" },
-          name: { $first: "$category.name" },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          slug: 1,
-          name: 1,
-        },
-      },
-      { $sort: { name: 1 } },
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      data: categories,
-    });
-  } catch (err) {
-    console.error("Fetch categories error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error while fetching categories",
-    });
-  }
-}
-
-async function fetchById(req, res) {
-  const { id } = req.params;
-
-  const product = await productModel.findById(id);
-
-  if (!product) {
-    return res.status(404).json({ message: "Product not found" });
-  }
-
-  return res
-    .status(200)
-    .json({ message: "Product fetch successfully!", product: product });
-}
-
-async function deleteOne(req, res) {
-  try {
-    const { id } = req.params;
-
-    const deletedProduct = await productModel.findByIdAndDelete(id);
-
-    if (!deletedProduct) {
+    // ১. ইমেজ চেক
+    if (!req.files || req.files.length === 0) {
       return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
+        .status(400)
+        .json({ success: false, message: 'At least one product image is required' });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Product deleted successfully",
-      product: deletedProduct,
-    });
-  } catch (err) {
-    console.error("Delete product error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-}
+    // ২. ইমেজকিটে আপলোড
+    const uploadPromises = req.files.map((file) => uploadFile(file.buffer, '/Products'));
+    const uploadResults = await Promise.all(uploadPromises);
 
-export { create, fetchAll, fetchById, update, deleteOne, fetchCategories };
+    const images = uploadResults.map((img, index) => ({
+      url: img.url,
+      fileId: img.fileId,
+      isPrimary: index === 0,
+    }));
+
+    const slug = slugify(title, { lower: true, strict: true });
+
+    // ৩. প্রাইস হ্যান্ডলিং (ভেরি ভেরি ইম্পর্ট্যান্ট ফিক্স)
+    // যদি আপনি পোস্টম্যানে price.base কি হিসেবে পাঠান, তবে req.body.price.base কাজ করবে না।
+    // সেরা উপায় হলো 'price' নামে কি পাঠানো এবং ভ্যালুতে {"base": 120, "original": 150} দেওয়া।
+
+    let finalPrice = {};
+    try {
+      finalPrice = typeof price === 'string' ? JSON.parse(price) : price;
+    } catch (e) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid price format. Send JSON string.' });
+    }
+
+    const product = await productModel.create({
+      title,
+      slug,
+      description,
+      category,
+      brand,
+      stock,
+      sku,
+      productType,
+      tags,
+      specifications,
+      price: finalPrice, // সরাসরি পার্স করা অবজেক্ট বসিয়ে দিন
+      images,
+    });
+
+    res.status(201).json({ success: true, message: 'Product created successfully!', product });
+  } catch (err) {
+    if (err.code === 11000)
+      return res.status(400).json({ success: false, message: 'SKU or Title already exists' });
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ২. GET ALL PRODUCTS (Public - With Filtering)
+export const getAllProducts = async (req, res) => {
+  try {
+    const { page = 1, limit = 12, category, brand, sort } = req.query;
+    let query = { status: 'Published' };
+
+    if (category) query.category = category;
+    if (brand) query.brand = brand;
+
+    const products = await productModel
+      .find(query)
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug')
+      .sort(sort ? { [sort]: 1 } : { createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await productModel.countDocuments(query);
+    res.json({ success: true, total, page, products });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ৩. GET SINGLE PRODUCT (SEO Friendly Slug)
+export const getProductBySlug = async (req, res) => {
+  try {
+    const product = await productModel
+      .findOne({ slug: req.params.slug })
+      .populate('category', 'name')
+      .populate('brand', 'name');
+
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    product.views += 1; // Popularity track
+    await product.save();
+
+    res.json({ success: true, product });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ৪. RELATED PRODUCTS
+export const getRelatedProducts = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const products = await productModel
+      .find({
+        category: categoryId,
+        status: 'Published',
+      })
+      .limit(4)
+      .select('title price images slug');
+
+    res.json({ success: true, products });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ৫. SEARCH PRODUCTS (Full Text Search)
+export const searchProducts = async (req, res) => {
+  try {
+    const { q } = req.query;
+    const products = await productModel
+      .find({ $text: { $search: q }, status: 'Published' }, { score: { $meta: 'textScore' } })
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(10);
+
+    res.json({ success: true, products });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Search failed' });
+  }
+};
+
+// ৬. UPDATE PRODUCT (Complex Logic)
+export const updateProduct = async (req, res) => {
+  try {
+    const productId = req.params.id;
+    let product = await productModel.findById(productId);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    let updateData = { ...req.body };
+
+    // ১. টাইটেল চেঞ্জ হলে স্লাগ আপডেট
+    if (req.body.title) {
+      updateData.slug = slugify(req.body.title, { lower: true, strict: true });
+    }
+
+    // ২. প্রাইস যদি স্ট্রিং হিসেবে আসে তবে পার্স করা
+    if (req.body.price) {
+      updateData.price =
+        typeof req.body.price === 'string' ? JSON.parse(req.body.price) : req.body.price;
+    }
+
+    // ৩. ইমেজ আপডেট লজিক
+    if (req.files && req.files.length > 0) {
+      // পুরনো ইমেজ ডিলিট (পুরানো images array থেকে fileId নিয়ে)
+      if (product.images && product.images.length > 0) {
+        await Promise.all(product.images.map((img) => deleteFile(img.fileId)));
+      }
+
+      const uploadResults = await Promise.all(
+        req.files.map((file) => uploadFile(file.buffer, '/Products'))
+      );
+      updateData.images = uploadResults.map((img, index) => ({
+        url: img.url,
+        fileId: img.fileId,
+        isPrimary: index === 0,
+      }));
+    }
+
+    const updatedProduct = await productModel.findByIdAndUpdate(productId, updateData, {
+      new: true,
+      runValidators: true, // ভ্যালিডেশন চেক করার জন্য
+    });
+
+    res.json({ success: true, message: 'Product updated!', product: updatedProduct });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ৭. UPDATE STATUS ONLY
+export const updateProductStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const product = await productModel.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json({ success: true, message: 'Status updated!', product });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Update failed' });
+  }
+};
+
+// ৮. DELETE PRODUCT
+export const deleteProduct = async (req, res) => {
+  try {
+    const product = await productModel.findById(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    await Promise.all(product.images.map((img) => deleteFile(img.fileId)));
+    await productModel.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'Product deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

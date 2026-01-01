@@ -1,4 +1,4 @@
-import { body, validationResult } from "express-validator";
+import { body, validationResult } from 'express-validator';
 
 // -------------------- HANDLE VALIDATION ERRORS -------------------- //
 const responseWithValidationErrors = (req, res, next) => {
@@ -17,69 +17,91 @@ const responseWithValidationErrors = (req, res, next) => {
 
 // -------------------- REGISTER VALIDATIONS -------------------- //
 const registerUserValidations = [
-  body("email")
+  body('fullname')
+    .trim()
     .notEmpty()
-    .withMessage("Email is required.")
+    .withMessage('Full name is required.')
+    .isLength({ min: 3 })
+    .withMessage('Full name must be at least 3 characters long.'),
+
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required.')
     .isEmail()
-    .withMessage("Please enter a valid email address."),
+    .withMessage('Please enter a valid email address.')
+    .normalizeEmail(),
 
-  body("password")
+  body('password')
     .notEmpty()
-    .withMessage("Password is required.")
+    .withMessage('Password is required.')
     .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters long."),
-
-  body("fullname.firstName")
-    .notEmpty()
-    .withMessage("First name is required.")
-    .isLength({ min: 2 })
-    .withMessage("First name must be at least 2 characters."),
-
-  body("fullname.lastName")
-    .notEmpty()
-    .withMessage("Last name is required.")
-    .isLength({ min: 2 })
-    .withMessage("Last name must be at least 2 characters."),
+    .withMessage('Password must be at least 6 characters long.'),
 
   responseWithValidationErrors,
 ];
 
 // -------------------- LOGIN VALIDATIONS -------------------- //
 const loginUserValidations = [
-  body("email")
+  body('email')
+    .trim()
     .notEmpty()
-    .withMessage("Email is required.")
+    .withMessage('Email is required.')
     .isEmail()
-    .withMessage("Please enter a valid email address."),
+    .withMessage('Please enter a valid email address.'),
 
-  body("password").notEmpty().withMessage("Password is required."),
+  body('password').notEmpty().withMessage('Password is required.'),
+
+  responseWithValidationErrors,
+];
+
+// -------------------- FORGOT PASSWORD VALIDATIONS -------------------- //
+const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required.')
+    .isEmail()
+    .withMessage('Please enter a valid email address.'),
+
+  responseWithValidationErrors,
+];
+
+// -------------------- RESET PASSWORD VALIDATIONS -------------------- //
+const resetPasswordValidation = [
+  body('password')
+    .notEmpty()
+    .withMessage('New password is required.')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long.'),
 
   responseWithValidationErrors,
 ];
 
 // -------------------- ADDRESS VALIDATIONS -------------------- //
 const addAddressValidation = [
-  body("phone")
+  body('phone')
     .trim()
     .notEmpty()
-    .withMessage("Phone number is required.")
-    .isLength({ min: 10, max: 15 })
-    .withMessage("Phone number must be between 10 and 15 digits."),
-  body("street").trim().notEmpty().withMessage("Street address is required."),
-  body("city").trim().notEmpty().withMessage("City is required."),
-  body("state").trim().notEmpty().withMessage("State is required."),
-  body("zip")
-    .trim()
-    .notEmpty()
-    .withMessage("ZIP code is required.")
-    .isPostalCode("any")
-    .withMessage("Invalid ZIP code format."),
-  body("country").trim().notEmpty().withMessage("Country is required."),
-  body("isDefault")
-    .optional()
-    .isBoolean()
-    .withMessage("isDefault must be a boolean"),
+    .withMessage('Phone number is required.')
+    .isLength({ min: 11, max: 15 })
+    .withMessage('Enter a valid phone number.'),
+
+  body('street').trim().notEmpty().withMessage('Street address is required.'),
+  body('city').trim().notEmpty().withMessage('City is required.'),
+  body('state').trim().notEmpty().withMessage('State is required.'),
+  body('zip').trim().notEmpty().withMessage('ZIP code is required.'),
+  body('country').trim().notEmpty().withMessage('Country is required.'),
+
+  body('isDefault').optional().isBoolean().withMessage('isDefault must be a boolean (true/false)'),
+
   responseWithValidationErrors,
 ];
 
-export { registerUserValidations, loginUserValidations, addAddressValidation };
+export {
+  registerUserValidations,
+  loginUserValidations,
+  addAddressValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
+};

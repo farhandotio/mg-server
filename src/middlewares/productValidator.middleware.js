@@ -1,258 +1,68 @@
-import { body, validationResult } from "express-validator";
+import { body, validationResult } from 'express-validator';
 
-// -------------------- HANDLE VALIDATION ERRORS -------------------- //
-const responseWithValidationErrors = (req, res, next) => {
+const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      errors: errors.array().map((err) => ({
-        field: err.path,
-        message: err.msg,
-      })),
+      errors: errors.array().map((err) => ({ field: err.path, message: err.msg })),
     });
   }
   next();
 };
 
-const createProductValidations = [
-  // title
-  body("title")
+export const productValidation = [
+  body('title')
     .trim()
     .notEmpty()
-    .withMessage("Title is required.")
-    .isLength({ min: 3 })
-    .withMessage("Title must be at least 3 characters long."),
+    .withMessage('Product title is required')
+    .isLength({ max: 200 })
+    .withMessage('Title cannot exceed 200 characters'),
 
-  // description
-  body("description")
-    .optional()
-    .isString()
-    .withMessage("Description must be a string."),
+  body('description').notEmpty().withMessage('Product description is required'),
 
-  // price.amount (nested)
-  body("priceAmount")
+  body('category')
     .notEmpty()
-    .withMessage("Price amount is required.")
-    .bail()
-    .isFloat({ gt: 0 })
-    .withMessage("Price amount must be a number greater than 0."),
+    .withMessage('Category ID is required')
+    .isMongoId()
+    .withMessage('Invalid Category ID format'),
 
-  // price.currency (nested)
-  body("priceCurrency")
-    .optional()
-    .isIn(["USD", "BDT"])
-    .withMessage("Currency must be either USD or BDT."),
-
-  // offer (percentage)
-  body("offer")
-    .optional()
-    .isFloat({ min: 0, max: 100 })
-    .withMessage("Offer must be a number between 0 and 100."),
-
-  // offerDeadline: optional, must be ISO8601 date and if provided must be in the future
-  body("offerDeadline")
-    .optional({ nullable: true })
-    .isISO8601()
-    .withMessage("Offer deadline must be a valid ISO8601 date.")
-    .bail()
-    .custom((value) => {
-      const date = new Date(value);
-      if (isNaN(date.getTime()))
-        throw new Error("Offer deadline is not a valid date.");
-      if (date <= new Date())
-        throw new Error("Offer deadline must be a future date/time.");
-      return true;
-    }),
-
-  // productType
-  body("productType")
-    .optional()
-    .isIn(["Standard", "HotDeals", "Featured"])
-    .withMessage("productType must be one of: Standard, HotDeals, Featured."),
-
-  // isAffiliate
-  body("isAffiliate")
-    .optional()
-    .isBoolean()
-    .withMessage("isAffiliate must be a boolean (true/false).")
-    .toBoolean(),
-
-  body("categoryName")
+  body('brand')
     .notEmpty()
-    .withMessage("Category name is required.")
-    .bail()
-    .isString()
-    .trim()
-    .withMessage("Category name must be a string."),
+    .withMessage('Brand ID is required')
+    .isMongoId()
+    .withMessage('Invalid Brand ID format'),
 
-  body("categorySlug")
-    .optional()
+  body('price.base')
     .notEmpty()
-    .withMessage("Category slug is required.")
-    .bail()
-    .isString()
-    .withMessage("Category slug must be a string.")
-    .matches(/^[a-z0-9-]+$/)
-    .withMessage(
-      "Category slug must be lowercase letters, numbers or dashes (e.g. 'bluetooth-tws')."
-    ),
+    .withMessage('Base price is required')
+    .isNumeric()
+    .withMessage('Price must be a number')
+    .custom((value) => value >= 0)
+    .withMessage('Price cannot be negative'),
 
-  // brand
-  body("brand")
-    .optional()
-    .isString()
-    .trim()
-    .withMessage("Brand must be a string."),
-
-  // stock & sold
-  body("stock")
-    .optional()
+  body('stock')
+    .notEmpty()
+    .withMessage('Stock quantity is required')
     .isInt({ min: 0 })
-    .withMessage("Stock must be an integer >= 0."),
+    .withMessage('Stock cannot be negative'),
 
-  body("sold")
+  body('sku')
+    .trim()
+    .notEmpty()
+    .withMessage('SKU is required')
+    .isUppercase()
+    .withMessage('SKU must be in uppercase'),
+
+  body('productType')
     .optional()
-    .isInt({ min: 0 })
-    .withMessage("Sold must be an integer >= 0."),
+    .isIn(['Regular', 'FlashSale', 'Featured', 'BestSeller', 'NewArrival'])
+    .withMessage('Invalid product type'),
 
-  // images
-  body("images")
+  body('status')
     .optional()
-    .isArray()
-    .withMessage("Images must be an array of objects."),
+    .isIn(['Draft', 'Published', 'OutOfStock', 'Archived'])
+    .withMessage('Invalid status type'),
 
-  body("images.*.url")
-    .optional()
-    .isURL()
-    .withMessage("Each image must have a valid 'url'."),
-
-  body("images.*.thumbnailUrl")
-    .optional()
-    .isURL()
-    .withMessage("Each image thumbnail must be a valid URL."),
-
-  body("images.*.fileId")
-    .optional()
-    .isString()
-    .withMessage("Each image must have a 'fileId' string."),
-
-  responseWithValidationErrors,
+  validate,
 ];
-
-const updateProductValidations = [
-  // title
-  body("title")
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage("Title must not be empty.")
-    .isLength({ min: 3 })
-    .withMessage("Title must be at least 3 characters long."),
-
-  // description
-  body("description")
-    .optional()
-    .isString()
-    .withMessage("Description must be a string."),
-
-  // price.amount (nested)
-  body("priceAmount")
-    .optional()
-    .isFloat({ gt: 0 })
-    .withMessage("Price amount must be a number greater than 0."),
-
-  // price.currency (nested)
-  body("priceCurrency")
-    .optional()
-    .isIn(["USD", "BDT"])
-    .withMessage("Currency must be either USD or BDT."),
-
-  // offer (percentage)
-  body("offer")
-    .optional()
-    .isFloat({ min: 0, max: 100 })
-    .withMessage("Offer must be a number between 0 and 100."),
-
-  // offerDeadline: optional, must be ISO8601 date and future
-  body("offerDeadline")
-    .optional({ nullable: true })
-    .isISO8601()
-    .withMessage("Offer deadline must be a valid ISO8601 date.")
-    .bail()
-    .custom((value) => {
-      const date = new Date(value);
-      if (isNaN(date.getTime()))
-        throw new Error("Offer deadline is not a valid date.");
-      if (date <= new Date())
-        throw new Error("Offer deadline must be a future date/time.");
-      return true;
-    }),
-
-  // productType
-  body("productType")
-    .optional()
-    .isIn(["Standard", "HotDeals", "Featured"])
-    .withMessage("productType must be one of: Standard, HotDeals, Featured."),
-
-  // isAffiliate
-  body("isAffiliate")
-    .optional()
-    .isBoolean()
-    .withMessage("isAffiliate must be a boolean (true/false).")
-    .toBoolean(),
-
-  // category
-  body("categoryName")
-    .optional()
-    .isString()
-    .trim()
-    .withMessage("Category name must be a string."),
-
-  body("categorySlug")
-    .optional()
-    .isString()
-    .withMessage("Category slug must be a string.")
-    .matches(/^[a-z0-9-]+$/)
-    .withMessage(
-      "Category slug must be lowercase letters, numbers or dashes (e.g. 'bluetooth-tws')."
-    ),
-
-  // brand
-  body("brand")
-    .optional()
-    .isString()
-    .trim()
-    .withMessage("Brand must be a string."),
-
-  // stock
-  body("stock")
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage("Stock must be an integer >= 0."),
-
-  // images
-  body("images")
-    .optional()
-    .isArray()
-    .withMessage("Images must be an array of objects."),
-
-  body("images.*.url")
-    .optional()
-    .isURL()
-    .withMessage("Each image must have a valid 'url'."),
-
-  body("images.*.thumbnailUrl")
-    .optional()
-    .isURL()
-    .withMessage("Each image thumbnail must be a valid URL."),
-
-  body("images.*.fileId")
-    .optional()
-    .isString()
-    .withMessage("Each image must have a 'fileId' string."),
-
-  responseWithValidationErrors,
-];
-
-export { createProductValidations, updateProductValidations };

@@ -1,94 +1,128 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema(
   {
     title: {
       type: String,
+      required: [true, 'Product title is required'],
+      trim: true,
+      maxlength: [200, 'Title cannot exceed 200 characters'],
+    },
+    slug: {
+      type: String,
       required: true,
+      unique: true,
+      lowercase: true,
     },
     description: {
       type: String,
+      required: [true, 'Product description is required'],
     },
-    price: {
-      amount: {
-        type: Number,
-        required: true,
-      },
-      currency: {
-        type: String,
-        enum: ["USD", "BDT"],
-        default: "BDT",
-      },
-    },
-    images: [
-      {
-        url: String,
-        thumbnailUrl: String,
-        fileId: String,
-      },
-    ],
-    offer: {
-      type: Number,
-    },
-    offerDeadline: {
-      type: Date,
-      default: null,
-    },
-
-    productType: {
+    shortDescription: {
       type: String,
-      enum: ["Standard", "Featured", "HotDeals"],
-      default: "Standard",
+      maxlength: [500, 'Short description cannot exceed 500 characters'],
     },
-
+    // Relationships
     category: {
-      name: { type: String, required: true, trim: true },
-      slug: { type: String, required: true, lowercase: true },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      required: [true, 'Category is required'],
     },
     brand: {
-      type: String,
-      trim: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Brand',
+      required: [true, 'Brand is required'],
     },
-    isActive: {
-      type: Boolean,
-      default: true,
+    // Pricing
+    price: {
+      base: { type: Number, required: true, min: 0 },
+      discounted: { type: Number, min: 0 },
     },
-    isAffiliate: {
-      type: Boolean,
-      default: false,
+    offer: {
+      percentage: { type: Number, default: 0, min: 0, max: 100 },
+      deadline: { type: Date, default: null },
     },
-
+    // Inventory & Tracking
     stock: {
       type: Number,
+      required: [true, 'Stock quantity is required'],
       min: 0,
-      default: 0,
+      default: 1,
     },
+    sku: {
+      type: String,
+      unique: true,
+      trim: true,
+      uppercase: true,
+      required: [true, 'SKU is required for inventory management'],
+    },
+    // Media (Multiple images)
+    images: [
+      {
+        url: { type: String, required: true },
+        fileId: { type: String, required: true },
+        isPrimary: { type: Boolean, default: false }, // মেইন ইমেজ চেনার জন্য
+      },
+    ],
+    // Professional Product Types
+    productType: {
+      type: String,
+      enum: ['Regular', 'FlashSale', 'Featured', 'BestSeller', 'NewArrival'],
+      default: 'Regular',
+    },
+    // Real-time Status Control
+    status: {
+      type: String,
+      enum: ['Draft', 'Published', 'OutOfStock', 'Archived'],
+      default: 'Published',
+    },
+    // Data tracking
+    sold: { type: Number, default: 0 },
+    views: { type: Number, default: 0 }, // কতজন দেখেছে (Popularity track)
 
-    sold: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },
-
-    // Review stats
-    averageRating: {
-      type: Number,
-      default: 0,
-    },
-    reviewCount: {
-      type: Number,
-      default: 0,
+    // Specifications (Dynamic - like Color, RAM, Size)
+    specifications: [
+      {
+        key: String, // e.g., "Color"
+        value: String, // e.g., "Midnight Black"
+      },
+    ],
+    // Search Optimization
+    tags: [{ type: String, trim: true }],
+    ratings: {
+      average: { type: Number, default: 0, min: 0, max: 5 },
+      count: { type: Number, default: 0 },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
-productSchema.index({
-  title: "text",
-  "category.slug": "text",
-  description: "text",
+// High-speed search index
+productSchema.index({ title: 'text', tags: 'text', sku: 'text' });
+
+/** * Middleware: অটোমেটিক ডিসকাউন্ট এবং আউট অফ স্টক স্ট্যাটাস আপডেট
+ */
+productSchema.pre('save', function (next) {
+  // ১. ক্যালকুলেট ডিসকাউন্ট
+  if (this.offer && this.offer.percentage > 0) {
+    this.price.discounted = Math.round(
+      this.price.base - (this.price.base * this.offer.percentage) / 100
+    );
+  } else {
+    this.price.discounted = this.price.base;
+  }
+
+  // ২. অটোমেটিক স্ট্যাটাস আপডেট যদি স্টক না থাকে
+  if (this.stock <= 0) {
+    this.status = 'OutOfStock';
+  }
+
+  next();
 });
 
-const productModel = mongoose.model("product", productSchema);
-
+const productModel = mongoose.model('Product', productSchema);
 export default productModel;
