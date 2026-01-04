@@ -9,6 +9,7 @@ import sendEmail from '../utils/email.js';
 export const register = async (req, res) => {
   try {
     const { fullname, email, password } = req.body;
+    console.log('Request Body:', req.body);
     const isUserExist = await userModel.findOne({ email: email.toLowerCase() });
     if (isUserExist) return res.status(409).json({ message: 'Email already exists.' });
 

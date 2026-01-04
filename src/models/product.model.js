@@ -61,7 +61,7 @@ const productSchema = new mongoose.Schema(
       {
         url: { type: String, required: true },
         fileId: { type: String, required: true },
-        isPrimary: { type: Boolean, default: false }, // মেইন ইমেজ চেনার জন্য
+        isPrimary: { type: Boolean, default: false },
       },
     ],
     // Professional Product Types

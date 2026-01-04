@@ -2,13 +2,15 @@ import productModel from '../models/product.model.js';
 import { uploadFile, deleteFile } from '../services/storage.service.js';
 import slugify from 'slugify';
 
-// ১. CREATE PRODUCT (Admin Only)
+// 1. Create
 export const createProduct = async (req, res) => {
   try {
     const {
       title,
       description,
-      price, // এটি সরাসরি অবজেক্ট হতে পারে যদি ডাটা ঠিকভাবে পাঠানো হয়
+      shortDescription,
+      price,
+      offer,
       stock,
       category,
       brand,
@@ -20,12 +22,38 @@ export const createProduct = async (req, res) => {
 
     // ১. ইমেজ চেক
     if (!req.files || req.files.length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'At least one product image is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'At least one product image is required',
+      });
     }
 
-    // ২. ইমেজকিটে আপলোড
+    // ২. স্মার্ট ডাটা পার্সিং ফাংশন
+    const parseData = (data) => {
+      if (!data) return undefined;
+      try {
+        return typeof data === 'string' ? JSON.parse(data) : data;
+      } catch (e) {
+        return data;
+      }
+    };
+
+    const finalPrice = parseData(price); // { base: 1000 }
+    const finalOffer = parseData(offer); // { percentage: 20 }
+    const finalSpecs = parseData(specifications);
+    const finalTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()) : tags;
+
+    // ৩. ডায়নামিক ডিসকাউন্টেড প্রাইস লজিক (অ্যাডিশনাল সেফটি)
+    // যদিও স্কিমাতে pre-save আছে, এখানেও আমরা নিশ্চিত করছি ডাটা ক্লিন কি না
+    let discountedAmount = finalPrice?.base || 0;
+
+    if (finalOffer && finalOffer.percentage > 0) {
+      discountedAmount = Math.round(
+        finalPrice.base - (finalPrice.base * finalOffer.percentage) / 100
+      );
+    }
+
+    // ৪. ইমেজকিটে আপলোড
     const uploadPromises = req.files.map((file) => uploadFile(file.buffer, '/Products'));
     const uploadResults = await Promise.all(uploadPromises);
 
@@ -35,65 +63,116 @@ export const createProduct = async (req, res) => {
       isPrimary: index === 0,
     }));
 
+    // ৫. স্লাগ জেনারেট
     const slug = slugify(title, { lower: true, strict: true });
 
-    // ৩. প্রাইস হ্যান্ডলিং (ভেরি ভেরি ইম্পর্ট্যান্ট ফিক্স)
-    // যদি আপনি পোস্টম্যানে price.base কি হিসেবে পাঠান, তবে req.body.price.base কাজ করবে না।
-    // সেরা উপায় হলো 'price' নামে কি পাঠানো এবং ভ্যালুতে {"base": 120, "original": 150} দেওয়া।
-
-    let finalPrice = {};
-    try {
-      finalPrice = typeof price === 'string' ? JSON.parse(price) : price;
-    } catch (e) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Invalid price format. Send JSON string.' });
-    }
-
-    const product = await productModel.create({
+    // ৬. প্রোডাক্ট অবজেক্ট তৈরি
+    const productData = {
       title,
       slug,
       description,
+      shortDescription,
       category,
       brand,
-      stock,
-      sku,
+      stock: Number(stock),
+      sku: sku.toUpperCase(),
       productType,
-      tags,
-      specifications,
-      price: finalPrice, // সরাসরি পার্স করা অবজেক্ট বসিয়ে দিন
+      tags: finalTags,
+      specifications: finalSpecs,
+      price: {
+        base: finalPrice?.base,
+        discounted: discountedAmount, // এখানে ডাইনামিক্যালি সেট হচ্ছে
+      },
       images,
-    });
+    };
 
-    res.status(201).json({ success: true, message: 'Product created successfully!', product });
+    // যদি অফার থাকে তবেই অফার অবজেক্ট অ্যাড হবে
+    if (finalOffer && finalOffer.percentage > 0) {
+      productData.offer = {
+        percentage: finalOffer.percentage,
+        deadline: finalOffer.deadline || null,
+      };
+    }
+
+    const product = await productModel.create(productData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully!',
+      product,
+    });
   } catch (err) {
-    if (err.code === 11000)
-      return res.status(400).json({ success: false, message: 'SKU or Title already exists' });
-    res.status(500).json({ success: false, message: err.message });
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyValue)[0];
+      return res.status(400).json({
+        success: false,
+        message: `${field.toUpperCase()} already exists.`,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
 // ২. GET ALL PRODUCTS (Public - With Filtering)
 export const getAllProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 12, category, brand, sort } = req.query;
+    const {
+      page = 1,
+      limit = 12,
+      category,
+      brand,
+      sort,
+      search,
+      'price.base[lte]': maxPrice,
+    } = req.query;
+
+    // ১. ডিফল্ট কোয়েরি
     let query = { status: 'Published' };
 
+    // ২. সার্চ ফিল্টার (এটি ফ্রন্টএন্ডের SearchOverlay এর জন্য কাজ করবে)
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // ৩. ক্যাটাগরি ও ব্র্যান্ড ফিল্টার
     if (category) query.category = category;
     if (brand) query.brand = brand;
+
+    // ৪. প্রাইস ফিল্টার (আপনার শপ পেজের স্লাইডার এর জন্য)
+    if (maxPrice) {
+      query['price.base'] = { $lte: Number(maxPrice) };
+    }
+
+    // ৫. সর্টিং লজিক
+    let sortQuery = { createdAt: -1 }; // Default: Newest
+    if (sort) {
+      if (sort === 'price.base') sortQuery = { 'price.base': 1 };
+      else if (sort === '-price.base') sortQuery = { 'price.base': -1 };
+      else if (sort === '-sold') sortQuery = { sold: -1 };
+      else sortQuery = { [sort]: 1 };
+    }
 
     const products = await productModel
       .find(query)
       .populate('category', 'name slug')
       .populate('brand', 'name slug')
-      .sort(sort ? { [sort]: 1 } : { createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .sort(sortQuery)
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
 
     const total = await productModel.countDocuments(query);
-    res.json({ success: true, total, page, products });
+
+    res.json({ success: true, total, page: Number(page), products });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error during fetching' });
   }
 };
 
@@ -137,10 +216,23 @@ export const getRelatedProducts = async (req, res) => {
 // ৫. SEARCH PRODUCTS (Full Text Search)
 export const searchProducts = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, search } = req.query;
+    const queryTerm = q || search; // ফ্রন্টএন্ডে 'search' আর ব্যাকএন্ডে 'q' উভয়কেই সাপোর্ট দিবে
+
+    if (!queryTerm) {
+      return res.json({ success: true, products: [] });
+    }
+
     const products = await productModel
-      .find({ $text: { $search: q }, status: 'Published' }, { score: { $meta: 'textScore' } })
-      .sort({ score: { $meta: 'textScore' } })
+      .find({
+        status: 'Published',
+        $or: [
+          { title: { $regex: queryTerm, $options: 'i' } },
+          { description: { $regex: queryTerm, $options: 'i' } },
+        ],
+      })
+      .select('title price images slug category')
+      .populate('category', 'name')
       .limit(10);
 
     res.json({ success: true, products });

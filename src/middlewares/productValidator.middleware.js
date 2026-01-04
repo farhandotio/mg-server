@@ -5,7 +5,11 @@ const validate = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      errors: errors.array().map((err) => ({ field: err.path, message: err.msg })),
+      // ফিল্ড অনুযায়ী এরর মেসেজগুলোকে অর্গানাইজ করা হয়েছে
+      errors: errors.array().map((err) => ({
+        field: err.path,
+        message: err.msg,
+      })),
     });
   }
   next();
@@ -21,6 +25,11 @@ export const productValidation = [
 
   body('description').notEmpty().withMessage('Product description is required'),
 
+  body('shortDescription')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Short description cannot exceed 500 characters'),
+
   body('category')
     .notEmpty()
     .withMessage('Category ID is required')
@@ -33,13 +42,27 @@ export const productValidation = [
     .isMongoId()
     .withMessage('Invalid Brand ID format'),
 
+  // Nested Price Validation
   body('price.base')
     .notEmpty()
     .withMessage('Base price is required')
     .isNumeric()
     .withMessage('Price must be a number')
-    .custom((value) => value >= 0)
+    .toFloat()
     .withMessage('Price cannot be negative'),
+
+  // Offer Validation (Schema তে percentage: min 0, max 100 আছে)
+  body('offer.percentage')
+    .optional()
+    .isNumeric()
+    .withMessage('Offer percentage must be a number')
+    .isInt({ min: 0, max: 100 })
+    .withMessage('Offer percentage must be between 0 and 100'),
+
+  body('offer.deadline')
+    .optional({ checkFalsy: true })
+    .isISO8601()
+    .withMessage('Invalid deadline date format'),
 
   body('stock')
     .notEmpty()
@@ -51,8 +74,7 @@ export const productValidation = [
     .trim()
     .notEmpty()
     .withMessage('SKU is required')
-    .isUppercase()
-    .withMessage('SKU must be in uppercase'),
+    .toUpperCase(),
 
   body('productType')
     .optional()
@@ -63,6 +85,9 @@ export const productValidation = [
     .optional()
     .isIn(['Draft', 'Published', 'OutOfStock', 'Archived'])
     .withMessage('Invalid status type'),
+
+  // Specifications Validation (Optional)
+  body('specifications').optional(),
 
   validate,
 ];
