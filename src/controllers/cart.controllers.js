@@ -1,15 +1,17 @@
 import cartModel from '../models/cart.model.js';
 import productModel from '../models/product.model.js';
 
-// ১. কার্টে আইটেম যোগ করা (Add/Update)
+// ১. কার্টে আইটেম যোগ করা (কোয়ান্টিটি বাড়ানো বা কমানো)
 export const addToCart = async (req, res) => {
   try {
     const { productId, quantity, sessionId } = req.body;
     const userId = req.user?._id || null;
 
+    // ১. প্রোডাক্ট ভ্যালিডেশন
     const product = await productModel.findById(productId);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
+    // ২. কার্ট খুঁজে বের করা
     let cart = await cartModel.findOne({
       $or: [{ user: userId, user: { $ne: null } }, { sessionId: sessionId }],
     });
@@ -18,29 +20,44 @@ export const addToCart = async (req, res) => {
       const itemIndex = cart.items.findIndex((p) => p.product.toString() === productId);
 
       if (itemIndex > -1) {
-        cart.items[itemIndex].quantity += Number(quantity);
-        cart.items[itemIndex].price = product.price.discounted;
+        // নতুন কোয়ান্টিটি ক্যালকুলেট করা (বর্তমান + ইনকামিং ডেল্টা)
+        const newQuantity = cart.items[itemIndex].quantity + Number(quantity);
+
+        if (newQuantity <= 0) {
+          // ফিক্স: কোয়ান্টিটি ০ বা তার কম হলে আইটেমটি রিমুভ করে দাও
+          cart.items.splice(itemIndex, 1);
+        } else {
+          // কোয়ান্টিটি আপডেট করো
+          cart.items[itemIndex].quantity = newQuantity;
+          cart.items[itemIndex].price = product.price.discounted;
+        }
       } else {
-        cart.items.push({
-          product: productId,
-          quantity: Number(quantity),
-          price: product.price.discounted,
-        });
+        // যদি আইটেমটি কার্টে না থাকে এবং কোয়ান্টিটি পজিটিভ হয় তবেই যোগ করো
+        if (Number(quantity) > 0) {
+          cart.items.push({
+            product: productId,
+            quantity: Number(quantity),
+            price: product.price.discounted,
+          });
+        }
       }
 
       if (userId && !cart.user) cart.user = userId;
       await cart.save();
     } else {
-      cart = await cartModel.create({
-        user: userId,
-        sessionId,
-        items: [
-          { product: productId, quantity: Number(quantity), price: product.price.discounted },
-        ],
-      });
+      // যদি কার্ট একদমই না থাকে এবং প্রথমবার আইটেম যোগ হয়
+      if (Number(quantity) > 0) {
+        cart = await cartModel.create({
+          user: userId,
+          sessionId,
+          items: [
+            { product: productId, quantity: Number(quantity), price: product.price.discounted },
+          ],
+        });
+      }
     }
 
-    // ফিক্স: রেসপন্স পাঠানোর আগে পপুলেট করা হয়েছে
+    // পপুলেট করে বিস্তারিত ডাটা পাঠানো (যাতে ফ্রন্টএন্ডে ইমেজ/টাইটেল থাকে)
     const populatedCart = await cart.populate(
       'items.product',
       'title images slug price brand stock'
@@ -51,7 +68,7 @@ export const addToCart = async (req, res) => {
   }
 };
 
-// ২. কার্ট দেখা (Get Cart Details)
+// ২. কার্ট দেখা
 export const getCart = async (req, res) => {
   try {
     const { sessionId } = req.query;
@@ -75,7 +92,7 @@ export const getCart = async (req, res) => {
   }
 };
 
-// ৩. কার্ট থেকে আইটেম রিমুভ করা
+// ৩. কার্ট থেকে আইটেম সরাসরি ডিলিট করা
 export const removeFromCart = async (req, res) => {
   try {
     const { productId, sessionId } = req.body;
@@ -88,8 +105,6 @@ export const removeFromCart = async (req, res) => {
     if (cart) {
       cart.items = cart.items.filter((item) => item.product.toString() !== productId);
       await cart.save();
-
-      // ফিক্স: রিমুভ করার পরেও বাকি আইটেমগুলো পপুলেট করতে হবে
       await cart.populate('items.product', 'title images slug price brand stock');
     }
 
@@ -138,7 +153,6 @@ export const mergeCart = async (req, res) => {
       resultCart = userCart;
     }
 
-    // ফিক্স: মার্জ হওয়ার পর পপুলেট করা হয়েছে
     await resultCart.populate('items.product', 'title images slug price brand stock');
     res.json({ success: true, cart: resultCart });
   } catch (err) {
