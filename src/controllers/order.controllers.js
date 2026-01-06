@@ -7,58 +7,72 @@ import productModel from '../models/product.model.js';
 // ১. Create Order (Checkout)
 export const createOrder = async (req, res) => {
   try {
-    const { shippingAddress, paymentMethod } = req.body;
+    const { shippingAddress, paymentMethod, orderItems: frontendItems } = req.body;
     const userId = req.user._id;
 
-    // ইউজারের কার্ট খুঁজে বের করা
+    // ১. কার্ট খুঁজে বের করা
     const cart = await cartModel.findOne({ user: userId }).populate('items.product');
-    if (!cart || cart.items.length === 0) {
+
+    // কার্ট বা ফ্রন্টএন্ড আইটেম কোনোটিই না থাকলে এরর
+    if (!cart && (!frontendItems || frontendItems.length === 0)) {
       return res.status(400).json({ success: false, message: 'Cart is empty' });
     }
 
-    // ডেলিভারি চার্জ নির্ধারণ (উদাহরণ: ঢাকা ৮০, ঢাকার বাইরে ১৫০)
     const shippingPrice = shippingAddress.city.toLowerCase() === 'dhaka' ? 80 : 150;
-    const totalPrice = cart.totalPrice + shippingPrice;
 
-    // অর্ডার আইটেম ফরম্যাট করা
-    const orderItems = cart.items.map((item) => ({
-      product: item.product._id,
-      title: item.product.title,
-      quantity: item.quantity,
-      price: item.price,
-      image: item.product.images[0].url,
-    }));
+    // ২. অর্ডার আইটেম প্রিপেয়ার করা
+    let orderItems;
+    let itemsPrice;
 
-    // অর্ডার তৈরি
+    if (cart && cart.items.length > 0) {
+      orderItems = cart.items.map((item) => ({
+        product: item.product._id,
+        title: item.product.title,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.product.images[0].url,
+      }));
+      itemsPrice = cart.totalPrice;
+    } else {
+      // ব্যাকআপ: যদি কার্ট না পাওয়া যায় তবে ফ্রন্টএন্ড ডাটা ব্যবহার করবে
+      orderItems = frontendItems;
+      itemsPrice = req.body.itemsPrice;
+    }
+
+    // ৩. ডাটাবেসে অর্ডার তৈরি করা (এটি বিকাশের জন্য আইডি তৈরি করবে)
     const order = await orderModel.create({
       user: userId,
       orderItems,
       shippingAddress,
-      paymentMethod,
-      itemsPrice: cart.totalPrice,
+      paymentMethod, // 'Online' অথবা 'COD'
+      itemsPrice,
       shippingPrice,
-      totalPrice,
-      paymentStatus: 'Pending',
+      totalPrice: itemsPrice + shippingPrice,
     });
 
-    // ইনভেন্টরি আপডেট (Stock কমানো এবং Sold বাড়ানো)
-    const updateStock = cart.items.map((item) => {
-      return productModel.findByIdAndUpdate(item.product._id, {
-        $inc: { stock: -item.quantity, sold: item.quantity },
+    console.log(`✅ Order Created [${paymentMethod}]:`, order._id);
+
+    // ৪. যদি COD হয়, তবে স্টক আপডেট ও কার্ট ডিলিট এখনই করুন
+    if (paymentMethod === 'COD') {
+      const updateStock = orderItems.map((item) => {
+        return productModel.findByIdAndUpdate(item.product, {
+          $inc: { stock: -item.quantity, sold: item.quantity },
+        });
       });
-    });
-    await Promise.all(updateStock);
+      await Promise.all(updateStock);
+      if (cart) await cartModel.findByIdAndDelete(cart._id);
 
-    // কার্ট ক্লিয়ার করা
-    await cartModel.findByIdAndDelete(cart._id);
+      return res.status(201).json({ success: true, orderId: order._id });
+    }
 
+    // ৫. অনলাইন পেমেন্টের ক্ষেত্রে আইডি রিটার্ন করা (যাতে বিকাশ স্লাইস কাজ করতে পারে)
     res.status(201).json({
       success: true,
-      message: 'Order placed successfully',
       orderId: order._id,
-      totalAmount: totalPrice,
+      message: 'Order created, proceed to payment',
     });
   } catch (err) {
+    console.error('🔥 Order Controller Error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
