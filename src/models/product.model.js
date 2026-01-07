@@ -104,21 +104,24 @@ const productSchema = new mongoose.Schema(
 // High-speed search index
 productSchema.index({ title: 'text', tags: 'text', sku: 'text' });
 
-/** * Middleware: অটোমেটিক ডিসকাউন্ট এবং আউট অফ স্টক স্ট্যাটাস আপডেট
- */
 productSchema.pre('save', function (next) {
-  // ১. ক্যালকুলেট ডিসকাউন্ট
-  if (this.offer && this.offer.percentage > 0) {
-    this.price.discounted = Math.round(
-      this.price.base - (this.price.base * this.offer.percentage) / 100
-    );
-  } else {
-    this.price.discounted = this.price.base;
+  // ১. ক্যালকুলেট ডিসকাউন্ট (যদি বেস প্রাইস থাকে)
+  if (this.price && this.price.base) {
+    if (this.offer && this.offer.percentage > 0) {
+      this.price.discounted = Math.round(
+        this.price.base - (this.price.base * this.offer.percentage) / 100
+      );
+    } else {
+      this.price.discounted = this.price.base;
+    }
   }
 
-  // ২. অটোমেটিক স্ট্যাটাস আপডেট যদি স্টক না থাকে
+  // ২. অটোমেটিক স্ট্যাটাস আপডেট
   if (this.stock <= 0) {
     this.status = 'OutOfStock';
+  } else if (this.status === 'OutOfStock' && this.stock > 0) {
+    // স্টক ফিরে আসলে অটোমেটিক পাবলিশ করা (ঐচ্ছিক)
+    this.status = 'Published';
   }
 
   next();

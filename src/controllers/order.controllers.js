@@ -1,28 +1,35 @@
 import orderModel from '../models/order.model.js';
 import cartModel from '../models/cart.model.js';
-import productModel from '../models/product.model.js';
+import updateStockAfterPayment from '../utils/updateStock.js';
 
 /** ==================== USER CONTROLLERS ==================== **/
 
 // ১. Create Order (Checkout)
 export const createOrder = async (req, res) => {
   try {
-    const { shippingAddress, paymentMethod, orderItems: frontendItems } = req.body;
+    const { shippingAddress, payment, orderItems: frontendItems } = req.body;
     const userId = req.user._id;
 
-    // ১. কার্ট খুঁজে বের করা
+    // ১. পেমেন্ট মেথড ভ্যালিডেশন
+    if (!payment?.method || !['COD', 'ONLINE'].includes(payment.method)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment method',
+      });
+    }
+
+    // ২. কার্ট খুঁজে বের করা
     const cart = await cartModel.findOne({ user: userId }).populate('items.product');
 
-    // কার্ট বা ফ্রন্টএন্ড আইটেম কোনোটিই না থাকলে এরর
     if (!cart && (!frontendItems || frontendItems.length === 0)) {
       return res.status(400).json({ success: false, message: 'Cart is empty' });
     }
 
+    // ৩. প্রাইসিং ক্যালকুলেশন
     const shippingPrice = shippingAddress.city.toLowerCase() === 'dhaka' ? 80 : 150;
 
-    // ২. অর্ডার আইটেম প্রিপেয়ার করা
-    let orderItems;
-    let itemsPrice;
+    let orderItems = [];
+    let itemsPrice = 0;
 
     if (cart && cart.items.length > 0) {
       orderItems = cart.items.map((item) => ({
@@ -30,49 +37,48 @@ export const createOrder = async (req, res) => {
         title: item.product.title,
         quantity: item.quantity,
         price: item.price,
-        image: item.product.images[0].url,
+        image: item.product.images[0]?.url || '',
       }));
       itemsPrice = cart.totalPrice;
     } else {
-      // ব্যাকআপ: যদি কার্ট না পাওয়া যায় তবে ফ্রন্টএন্ড ডাটা ব্যবহার করবে
       orderItems = frontendItems;
-      itemsPrice = req.body.itemsPrice;
+      itemsPrice = req.body.pricing?.itemsPrice || 0;
     }
 
-    // ৩. ডাটাবেসে অর্ডার তৈরি করা (এটি বিকাশের জন্য আইডি তৈরি করবে)
+    const totalPrice = itemsPrice + shippingPrice;
+
+    // ৪. অর্ডার তৈরি
     const order = await orderModel.create({
       user: userId,
       orderItems,
       shippingAddress,
-      paymentMethod, // 'Online' অথবা 'COD'
-      itemsPrice,
-      shippingPrice,
-      totalPrice: itemsPrice + shippingPrice,
+      payment: {
+        method: payment.method,
+        status: 'PENDING',
+        provider: payment.method === 'ONLINE' ? 'SSLCOMMERZ' : 'NONE',
+      },
+      pricing: {
+        itemsPrice,
+        shippingPrice,
+        totalPrice,
+      },
+      // ONLINE হলে পেমেন্ট না পাওয়া পর্যন্ত PENDING থাকবে
+      orderStatus: payment.method === 'COD' ? 'CONFIRMED' : 'PENDING',
     });
 
-    console.log(`✅ Order Created [${paymentMethod}]:`, order._id);
-
-    // ৪. যদি COD হয়, তবে স্টক আপডেট ও কার্ট ডিলিট এখনই করুন
-    if (paymentMethod === 'COD') {
-      const updateStock = orderItems.map((item) => {
-        return productModel.findByIdAndUpdate(item.product, {
-          $inc: { stock: -item.quantity, sold: item.quantity },
-        });
-      });
-      await Promise.all(updateStock);
-      if (cart) await cartModel.findByIdAndDelete(cart._id);
-
-      return res.status(201).json({ success: true, orderId: order._id });
+    // ৫. কার্ট হ্যান্ডলিং (COD হলে এখনই ক্লিয়ার, ONLINE হলে sslSuccess এ হবে)
+    if (payment.method === 'COD' && cart) {
+      await cartModel.findByIdAndDelete(cart._id);
     }
 
-    // ৫. অনলাইন পেমেন্টের ক্ষেত্রে আইডি রিটার্ন করা (যাতে বিকাশ স্লাইস কাজ করতে পারে)
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       orderId: order._id,
-      message: 'Order created, proceed to payment',
+      totalAmount: totalPrice,
+      paymentRequired: payment.method === 'ONLINE',
     });
   } catch (err) {
-    console.error('🔥 Order Controller Error:', err);
+    console.error('🔥 Order Create Error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -93,7 +99,6 @@ export const getOrderDetails = async (req, res) => {
     const order = await orderModel.findById(req.params.id).populate('user', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // সিকিউরিটি চেক: অর্ডারটি কি এই ইউজারেরই?
     if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
@@ -108,20 +113,22 @@ export const getOrderDetails = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const order = await orderModel.findById(req.params.id);
+
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    if (order.orderStatus !== 'Processing') {
-      return res
-        .status(400)
-        .json({ message: 'Cannot cancel an order that is already shipped or delivered' });
+    // শুধুমাত্র আনপেইড পেন্ডিং অর্ডার ক্যানসেল করা যাবে
+    if (order.orderStatus !== 'PENDING' || order.payment.status === 'PAID') {
+      return res.status(400).json({
+        message: 'Order cannot be cancelled at this stage',
+      });
     }
 
-    order.orderStatus = 'Cancelled';
+    order.orderStatus = 'CANCELLED';
     await order.save();
 
-    res.json({ success: true, message: 'Order cancelled successfully' });
+    res.json({ success: true, message: 'Order cancelled' });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Cancellation failed' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -148,30 +155,51 @@ export const updateOrderStatus = async (req, res) => {
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    order.orderStatus = status;
-    if (status === 'Delivered') {
-      order.deliveredAt = Date.now();
-      order.paymentStatus = 'Paid'; // ডেলিভারি হলে অটো পেইড ধরে নেওয়া যায় (COD এর ক্ষেত্রে)
+    if (order.orderStatus === 'DELIVERED') {
+      return res.status(400).json({ message: 'Order already delivered' });
     }
 
+    // ✅ ডেলিভারি লজিক এবং স্টক আপডেট
+    if (status === 'DELIVERED') {
+      // যদি COD হয়, তবে ডেলিভারির সময় পেমেন্ট 'PAID' হবে এবং স্টক কমবে
+      if (order.payment.method === 'COD' && order.payment.status !== 'PAID') {
+        order.payment.status = 'PAID';
+        order.payment.paidAt = new Date();
+        await updateStockAfterPayment(order);
+      }
+      // নোট: অনলাইন পেমেন্টের ক্ষেত্রে স্টক অলরেডি sslSuccess এ কমে গেছে, তাই এখানে আর কমবে না।
+      order.deliveredAt = new Date();
+    }
+
+    order.orderStatus = status;
     await order.save();
-    res.json({ success: true, message: `Order updated to ${status}` });
+    res.json({ success: true, message: `Status updated to ${status}` });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Status update failed' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ৭. Update Payment Status (Admin)
+// ৭. Update Payment Status (Admin - Manual)
 export const updatePaymentStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const order = await orderModel.findByIdAndUpdate(
-      req.params.id,
-      { paymentStatus: status },
-      { new: true }
-    );
-    res.json({ success: true, message: 'Payment status updated', order });
+    const order = await orderModel.findById(req.params.id);
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // যদি ম্যানুয়ালি PAID করা হয় যা আগে PAID ছিল না, তবে স্টক আপডেট করতে হবে (শুধুমাত্র COD এর জন্য)
+    if (status === 'PAID' && order.payment.status !== 'PAID') {
+      if (order.payment.method === 'COD') {
+        await updateStockAfterPayment(order);
+      }
+      order.payment.paidAt = new Date();
+    }
+
+    order.payment.status = status;
+    await order.save();
+
+    res.json({ success: true, order });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Payment update failed' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };

@@ -11,7 +11,7 @@ import productRoutes from './routes/product.routes.js';
 import cartRoutes from './routes/cart.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import reviewRoutes from './routes/review.routes.js';
-import bkashRoutes from './routes/bkash.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const app = express();
 
@@ -25,6 +25,7 @@ app.use(
 );
 app.use(morgan('combined'));
 app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes call
 app.use('/api/auth', authRoutes);
@@ -34,6 +35,6 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/bkash', bkashRoutes);
+app.use('/api/payment', paymentRoutes);
 
 export default app;
