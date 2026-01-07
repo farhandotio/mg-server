@@ -168,19 +168,31 @@ export const getAddresses = async (req, res) => {
 
 export const addAddress = async (req, res) => {
   try {
-    if (req.body.isDefault)
+    const { phone, street, city, state, zip, country, isDefault } = req.body;
+
+    // যদি এটি ডিফল্ট অ্যাড্রেস হয়, তবে বাকি সবগুলোকে false করে দিন
+    if (isDefault) {
       await userModel.updateOne(
         { _id: req.user.id },
         { $set: { 'addresses.$[].isDefault': false } }
       );
+    }
+
     const user = await userModel.findByIdAndUpdate(
       req.user.id,
-      { $push: { addresses: req.body } },
-      { new: true }
+      {
+        $push: {
+          addresses: { phone, street, city, state, zip, country, isDefault },
+        },
+      },
+      { new: true, runValidators: true }
     );
-    res.status(201).json({ addresses: user.addresses });
+
+    // ফ্রন্টএন্ড রেডাক্স যেন ঠিকমতো ডাটা পায় তাই সরাসরি addresses পাঠানো হচ্ছে
+    res.status(201).json({ success: true, addresses: user.addresses });
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Add Address Error:', err);
+    res.status(500).json({ message: 'Failed to add address' });
   }
 };
 
