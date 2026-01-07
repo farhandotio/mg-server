@@ -5,16 +5,19 @@ import * as valid from '../middlewares/cartValidator.middleware.js';
 
 const router = express.Router();
 
-// ১. গেট কার্ট (Query validation)
+// ১. গেট কার্ট
 router.get('/', optionalAuth, valid.getCartValidation, controller.getCart);
 
-// ২. অ্যাড টু কার্ট
+// ২. অ্যাড টু কার্ট (নতুন আইটেম যোগ করার জন্য)
 router.post('/add', optionalAuth, valid.addToCartValidation, controller.addToCart);
 
-// ৩. রিমুভ ফ্রম কার্ট
+// ৩. আপডেট কার্ট (প্লাস/মাইনাস বাটনের জন্য কোয়ান্টিটি বাড়ানো বা কমানো)
+router.post('/update', optionalAuth, controller.updateCartQuantity);
+
+// ৪. রিমুভ ফ্রম কার্ট
 router.post('/remove', optionalAuth, valid.removeFromCartValidation, controller.removeFromCart);
 
-// ৪. মার্জ কার্ট (অবশ্যই লগইন করা থাকতে হবে)
+// ৫. মার্জ কার্ট
 router.post('/merge', requireAuth, valid.mergeCartValidation, controller.mergeCart);
 
 export default router;
