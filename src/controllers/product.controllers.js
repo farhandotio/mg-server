@@ -127,13 +127,11 @@ export const getAllProducts = async (req, res) => {
       brand,
       sort,
       search,
-      'price.base[lte]': maxPrice,
+      'price.base[lte]': maxPrice, 
     } = req.query;
 
-    // ১. ডিফল্ট কোয়েরি
     let query = { status: 'Published' };
 
-    // ২. সার্চ ফিল্টার (এটি ফ্রন্টএন্ডের SearchOverlay এর জন্য কাজ করবে)
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -141,38 +139,47 @@ export const getAllProducts = async (req, res) => {
       ];
     }
 
-    // ৩. ক্যাটাগরি ও ব্র্যান্ড ফিল্টার
     if (category) query.category = category;
     if (brand) query.brand = brand;
 
-    // ৪. প্রাইস ফিল্টার (আপনার শপ পেজের স্লাইডার এর জন্য)
     if (maxPrice) {
       query['price.base'] = { $lte: Number(maxPrice) };
     }
 
-    // ৫. সর্টিং লজিক
-    let sortQuery = { createdAt: -1 }; // Default: Newest
+    let sortQuery = { createdAt: -1 }; 
     if (sort) {
       if (sort === 'price.base') sortQuery = { 'price.base': 1 };
       else if (sort === '-price.base') sortQuery = { 'price.base': -1 };
       else if (sort === '-sold') sortQuery = { sold: -1 };
-      else sortQuery = { [sort]: 1 };
+      else sortQuery = { [sort]: -1 }; 
     }
 
-    const products = await productModel
-      .find(query)
-      .populate('category', 'name slug')
-      .populate('brand', 'name slug')
-      .sort(sortQuery)
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit));
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [products, totalProducts] = await Promise.all([
+      productModel
+        .find(query)
+        .populate('category', 'name slug')
+        .populate('brand', 'name slug')
+        .sort(sortQuery)
+        .limit(Number(limit))
+        .skip(skip),
+      productModel.countDocuments(query)
+    ]);
 
-    const total = await productModel.countDocuments(query);
-
-    res.json({ success: true, total, page: Number(page), products });
+    res.json({ 
+      success: true, 
+      products,
+      pagination: {
+        totalProducts,
+        totalPages: Math.ceil(totalProducts / Number(limit)),
+        currentPage: Number(page),
+        limit: Number(limit)
+      }
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error during fetching' });
+    console.error('Fetch Error:', err);
+    res.status(500).json({ success: false, message: 'Vault Access Denied!' });
   }
 };
 
