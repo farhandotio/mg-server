@@ -67,7 +67,7 @@ const productSchema = new mongoose.Schema(
     // Professional Product Types
     productType: {
       type: String,
-      enum: ['Regular', 'FlashSale', 'Featured', 'BestSeller', 'NewArrival'],
+      enum: ['Regular', 'FlashSale', "HotDeals", 'Featured', 'BestSeller', 'NewArrival'],
       default: 'Regular',
     },
     // Real-time Status Control

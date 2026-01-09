@@ -78,7 +78,7 @@ export const productValidation = [
 
   body('productType')
     .optional()
-    .isIn(['Regular', 'FlashSale', 'Featured', 'BestSeller', 'NewArrival'])
+    .isIn(['Regular', 'FlashSale', "HotDeals", 'Featured', 'BestSeller', 'NewArrival'])
     .withMessage('Invalid product type'),
 
   body('status')
