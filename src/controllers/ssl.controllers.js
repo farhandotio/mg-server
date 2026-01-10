@@ -90,7 +90,7 @@ export const sslSuccess = async (req, res) => {
 
       if (!order) {
         console.log('Order Not Found in DB for ID:', tran_id);
-        return res.redirect('http://localhost:3000/payment-failed');
+        return res.redirect('https://mg-server-rpzk.onrender.com/payment-failed');
       }
 
       if (order.payment.status !== 'PAID') {
@@ -104,14 +104,14 @@ export const sslSuccess = async (req, res) => {
       }
 
       // সরাসরি সাকসেস পেজে রিডাইরেক্ট করুন
-      return res.redirect(`http://localhost:3000/order-success/${order._id}`);
+      return res.redirect(`https://mg-server-rpzk.onrender.com/order-success/${order._id}`);
     } else {
       console.log('SSL Status was not valid:', status);
-      return res.redirect('http://localhost:3000/payment-failed');
+      return res.redirect('https://mg-server-rpzk.onrender.com/payment-failed');
     }
   } catch (err) {
     console.error('SSL Success Error:', err);
-    res.redirect('http://localhost:3000/payment-failed');
+    res.redirect('https://mg-server-rpzk.onrender.com/payment-failed');
   }
 };
 
@@ -143,9 +143,9 @@ export const sslIPN = async (req, res) => {
 
 // ৪. ক্যানসেল ও ফেইল হ্যান্ডলার
 export const sslCancel = async (req, res) => {
-  res.redirect('http://localhost:3000/payment-cancelled');
+  res.redirect('https://mg-server-rpzk.onrender.com/payment-cancelled');
 };
 
 export const sslFail = async (req, res) => {
-  res.redirect('http://localhost:3000/payment-failed');
+  res.redirect('https://mg-server-rpzk.onrender.com/payment-failed');
 };
