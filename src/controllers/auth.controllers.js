@@ -25,6 +25,7 @@ export const register = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'none',
+      path: '/', 
     });
 
     await sendEmail({
@@ -33,12 +34,10 @@ export const register = async (req, res) => {
       message: `Hi ${fullname}, welcome to our store!`,
     });
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
-      });
+    res.status(201).json({
+      success: true,
+      user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -60,14 +59,13 @@ export const login = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'none',
+      path: '/',
     });
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
-      });
+    res.status(200).json({
+      success: true,
+      user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -78,7 +76,7 @@ export const logout = (req, res) => {
     res.clearCookie('token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'none',
       path: '/',
     });
 
