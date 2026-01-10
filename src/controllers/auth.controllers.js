@@ -74,17 +74,21 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  res.cookie('token', null, {
-    expires: new Date(0), 
-    httpOnly: true, 
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict', 
-  });
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
 
-  res.status(200).json({
-    success: true,
-    message: 'Logged out successfully',
-  });
+    return res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Logout failed' });
+  }
 };
 
 /** --- PASSWORD MANAGEMENT --- **/
