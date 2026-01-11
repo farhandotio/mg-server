@@ -1,5 +1,5 @@
 import productModel from '../models/product.model.js';
-import { uploadFile, deleteFile } from '../services/storage.service.js';
+import { deleteFile } from '../utils/imageKit.js';
 import slugify from 'slugify';
 
 // 1. Create
@@ -18,17 +18,18 @@ export const createProduct = async (req, res) => {
       productType,
       tags,
       specifications,
+      images, 
     } = req.body;
 
-    // ১. ইমেজ চেক
-    if (!req.files || req.files.length === 0) {
+    // ১. ইমেজ চেক (এখন req.files না দেখে req.body.images দেখব)
+    if (!images || !Array.isArray(images) || images.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'At least one product image is required',
       });
     }
 
-    // ২. স্মার্ট ডাটা পার্সিং ফাংশন
+    // ২. ডাটা পার্সিং (ফ্রন্টেন্ড থেকে JSON হিসেবে পাঠালে parseData দরকার হয় না, তবুও সেফটি হিসেবে রাখা হলো)
     const parseData = (data) => {
       if (!data) return undefined;
       try {
@@ -38,35 +39,23 @@ export const createProduct = async (req, res) => {
       }
     };
 
-    const finalPrice = parseData(price); // { base: 1000 }
-    const finalOffer = parseData(offer); // { percentage: 20 }
+    const finalPrice = parseData(price);
+    const finalOffer = parseData(offer);
     const finalSpecs = parseData(specifications);
     const finalTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()) : tags;
 
-    // ৩. ডায়নামিক ডিসকাউন্টেড প্রাইস লজিক (অ্যাডিশনাল সেফটি)
-    // যদিও স্কিমাতে pre-save আছে, এখানেও আমরা নিশ্চিত করছি ডাটা ক্লিন কি না
+    // ৩. ডিসকাউন্টেড প্রাইস লজিক
     let discountedAmount = finalPrice?.base || 0;
-
     if (finalOffer && finalOffer.percentage > 0) {
       discountedAmount = Math.round(
         finalPrice.base - (finalPrice.base * finalOffer.percentage) / 100
       );
     }
 
-    // ৪. ইমেজকিটে আপলোড
-    const uploadPromises = req.files.map((file) => uploadFile(file.buffer, '/Products'));
-    const uploadResults = await Promise.all(uploadPromises);
-
-    const images = uploadResults.map((img, index) => ({
-      url: img.url,
-      fileId: img.fileId,
-      isPrimary: index === 0,
-    }));
-
-    // ৫. স্লাগ জেনারেট
+    // ৪. স্লাগ জেনারেট
     const slug = slugify(title, { lower: true, strict: true });
 
-    // ৬. প্রোডাক্ট অবজেক্ট তৈরি
+    // ৫. প্রোডাক্ট অবজেক্ট তৈরি
     const productData = {
       title,
       slug,
@@ -75,18 +64,17 @@ export const createProduct = async (req, res) => {
       category,
       brand,
       stock: Number(stock),
-      sku: sku.toUpperCase(),
+      sku: sku ? sku.toUpperCase() : `SKU-${Date.now()}`,
       productType,
       tags: finalTags,
       specifications: finalSpecs,
       price: {
         base: finalPrice?.base,
-        discounted: discountedAmount, // এখানে ডাইনামিক্যালি সেট হচ্ছে
+        discounted: discountedAmount,
       },
-      images,
+      images, // ইমেজগুলো এখন সরাসরি ডাটাবেসে সেভ হবে
     };
 
-    // যদি অফার থাকে তবেই অফার অবজেক্ট অ্যাড হবে
     if (finalOffer && finalOffer.percentage > 0) {
       productData.offer = {
         percentage: finalOffer.percentage,
@@ -248,12 +236,14 @@ export const searchProducts = async (req, res) => {
   }
 };
 
-// ৬. UPDATE PRODUCT (Complex Logic)
 export const updateProduct = async (req, res) => {
   try {
     const productId = req.params.id;
     let product = await productModel.findById(productId);
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
 
     let updateData = { ...req.body };
 
@@ -262,35 +252,56 @@ export const updateProduct = async (req, res) => {
       updateData.slug = slugify(req.body.title, { lower: true, strict: true });
     }
 
-    // ২. প্রাইস যদি স্ট্রিং হিসেবে আসে তবে পার্স করা
-    if (req.body.price) {
-      updateData.price =
-        typeof req.body.price === 'string' ? JSON.parse(req.body.price) : req.body.price;
-    }
+    // ২. স্মার্ট ডাটা পার্সিং (সেফটি চেক)
+    const parseData = (data) => {
+      if (!data) return undefined;
+      try {
+        return typeof data === 'string' ? JSON.parse(data) : data;
+      } catch (e) {
+        return data;
+      }
+    };
 
-    // ৩. ইমেজ আপডেট লজিক
-    if (req.files && req.files.length > 0) {
-      // পুরনো ইমেজ ডিলিট (পুরানো images array থেকে fileId নিয়ে)
+    if (req.body.price) updateData.price = parseData(req.body.price);
+    if (req.body.offer) updateData.offer = parseData(req.body.offer);
+    if (req.body.specifications) updateData.specifications = parseData(req.body.specifications);
+
+    // ৩. ইমেজ আপডেট লজিক (Client-side থেকে images আসলে)
+    // images: [ {url, fileId, isPrimary}, ... ]
+    if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+      // পুরনো ইমেজগুলো ImageKit থেকে ডিলিট করা (যদি নতুন ইমেজ সেট করা হয়)
       if (product.images && product.images.length > 0) {
-        await Promise.all(product.images.map((img) => deleteFile(img.fileId)));
+        const deletePromises = product.images.map((img) => deleteFile(img.fileId));
+        await Promise.all(deletePromises);
       }
 
-      const uploadResults = await Promise.all(
-        req.files.map((file) => uploadFile(file.buffer, '/Products'))
-      );
-      updateData.images = uploadResults.map((img, index) => ({
-        url: img.url,
-        fileId: img.fileId,
-        isPrimary: index === 0,
-      }));
+      // নতুন ইমেজ সেট করা (যা ফ্রন্টেন্ড থেকে এসেছে)
+      updateData.images = req.body.images;
     }
 
-    const updatedProduct = await productModel.findByIdAndUpdate(productId, updateData, {
-      new: true,
-      runValidators: true, // ভ্যালিডেশন চেক করার জন্য
-    });
+    // ৪. ডিসকাউন্টেড প্রাইস রি-ক্যালকুলেশন (যদি প্রাইস বা অফার আপডেট হয়)
+    if (updateData.price || updateData.offer) {
+      const basePrice = updateData.price?.base || product.price.base;
+      const offerPercent = updateData.offer?.percentage || product.offer?.percentage || 0;
 
-    res.json({ success: true, message: 'Product updated!', product: updatedProduct });
+      updateData.price = {
+        ...updateData.price,
+        base: basePrice,
+        discounted: Math.round(basePrice - (basePrice * offerPercent) / 100),
+      };
+    }
+
+    const updatedProduct = await productModel.findByIdAndUpdate(
+      productId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully!',
+      product: updatedProduct,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

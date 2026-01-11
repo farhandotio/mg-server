@@ -27,6 +27,10 @@ app.use(morgan('combined'));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/', (req, res) => {
+  res.send('Server is running...');
+});
+
 // Routes call
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
