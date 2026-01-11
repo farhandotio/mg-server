@@ -6,10 +6,114 @@ import { v4 as uuidv4 } from 'uuid';
 import updateStockAfterPayment from '../utils/updateStock.js';
 
 // ১. পেমেন্ট ইনিশিয়েট করা
+// export const initSSLPayment = async (req, res) => {
+//   try {
+//     const { orderId } = req.body;
+
+//     const order = await Order.findById(orderId).populate('user');
+
+//     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+//     if (order.payment.status === 'PAID') {
+//       return res.status(400).json({ message: 'Order already paid' });
+//     }
+
+//     const tran_id = `TXN_${uuidv4()}`;
+
+//     const payload = {
+//       store_id: process.env.SSLCOMMERZ_STORE_ID,
+
+//       store_passwd: process.env.SSLCOMMERZ_STORE_PASSWORD,
+
+//       total_amount: parseFloat(order.pricing.totalPrice).toFixed(2),
+
+//       currency: 'BDT',
+
+//       tran_id,
+
+//       success_url: process.env.SSLCOMMERZ_SUCCESS_URL,
+
+//       fail_url: process.env.SSLCOMMERZ_FAIL_URL,
+
+//       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
+
+//       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
+
+//       // কাস্টমার ইনফো
+
+//       cus_name: order.shippingAddress.fullname,
+
+//       cus_email: order.user.email || 'customer@email.com',
+
+//       cus_phone: order.shippingAddress.phoneNumber,
+
+//       cus_add1: order.shippingAddress.address,
+
+//       cus_city: order.shippingAddress.city,
+
+//       cus_country: 'Bangladesh',
+
+//       ship_name: order.shippingAddress.fullname,
+
+//       ship_add1: order.shippingAddress.address,
+
+//       ship_city: order.shippingAddress.city,
+
+//       ship_state: order.shippingAddress.city,
+
+//       ship_postcode: '1000',
+
+//       ship_country: 'Bangladesh',
+
+//       shipping_method: 'Courier',
+
+//       product_name: 'Ecommerce Order',
+
+//       product_category: 'General',
+
+//       product_profile: 'general',
+//     };
+
+//     const response = await axios.post(
+//       `${process.env.SSLCOMMERZ_BASE_URL}/gwprocess/v4/api.php`,
+
+//       qs.stringify(payload),
+
+//       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+//     );
+
+//     if (response.data?.status === 'SUCCESS') {
+//       order.payment.transactionId = tran_id;
+
+//       order.payment.provider = 'SSLCOMMERZ';
+
+//       await order.save();
+
+//       res.json({
+//         success: true,
+
+//         gatewayUrl: response.data.GatewayPageURL,
+//       });
+//     } else {
+//       console.log('SSL Failed Reason:', response.data.failedreason);
+
+//       res.status(400).json({
+//         message: response.data.failedreason || 'SSL Session failed',
+
+//         data: response.data,
+//       });
+//     }
+//   } catch (err) {
+//     res.status(500).json({ message: 'SSL init failed', error: err.message });
+//   }
+// };
+
+// ১. পেমেন্ট ইনিশিয়েট করা
 export const initSSLPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
 
+    // populate user for getting customer email
     const order = await Order.findById(orderId).populate('user');
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -22,88 +126,63 @@ export const initSSLPayment = async (req, res) => {
 
     const payload = {
       store_id: process.env.SSLCOMMERZ_STORE_ID,
-
       store_passwd: process.env.SSLCOMMERZ_STORE_PASSWORD,
-
       total_amount: parseFloat(order.pricing.totalPrice).toFixed(2),
-
       currency: 'BDT',
-
       tran_id,
-
       success_url: process.env.SSLCOMMERZ_SUCCESS_URL,
-
       fail_url: process.env.SSLCOMMERZ_FAIL_URL,
-
       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
-
       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
 
-      // কাস্টমার ইনফো
-
-      cus_name: order.shippingAddress.fullname,
-
-      cus_email: order.user.email || 'customer@email.com',
-
-      cus_phone: order.shippingAddress.phoneNumber,
-
-      cus_add1: order.shippingAddress.address,
-
+      // কাস্টমার ইনফো (আপনার নতুন মডেল অনুযায়ী ম্যাপিং)
+      cus_name: order.user?.fullname || order.user?.name || 'Customer', // User model অনুযায়ী
+      cus_email: order.user?.email || 'customer@email.com',
+      cus_phone: order.shippingAddress.phone, // Model mapping: phone
+      cus_add1: order.shippingAddress.street, // Model mapping: street
       cus_city: order.shippingAddress.city,
+      cus_state: order.shippingAddress.state,
+      cus_postcode: order.shippingAddress.zip,
+      cus_country: order.shippingAddress.country || 'Bangladesh',
 
-      cus_country: 'Bangladesh',
-
-      ship_name: order.shippingAddress.fullname,
-
-      ship_add1: order.shippingAddress.address,
-
+      // শিপিং ইনফো
+      ship_name: order.user?.fullname || 'Customer',
+      ship_add1: order.shippingAddress.street,
       ship_city: order.shippingAddress.city,
-
-      ship_state: order.shippingAddress.city,
-
-      ship_postcode: '1000',
-
-      ship_country: 'Bangladesh',
+      ship_state: order.shippingAddress.state,
+      ship_postcode: order.shippingAddress.zip,
+      ship_country: order.shippingAddress.country,
 
       shipping_method: 'Courier',
-
-      product_name: 'Ecommerce Order',
-
+      product_name: 'Gadget BDS Order',
       product_category: 'General',
-
       product_profile: 'general',
     };
 
     const response = await axios.post(
       `${process.env.SSLCOMMERZ_BASE_URL}/gwprocess/v4/api.php`,
-
       qs.stringify(payload),
-
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
     if (response.data?.status === 'SUCCESS') {
       order.payment.transactionId = tran_id;
-
       order.payment.provider = 'SSLCOMMERZ';
-
       await order.save();
 
       res.json({
         success: true,
-
         gatewayUrl: response.data.GatewayPageURL,
       });
     } else {
       console.log('SSL Failed Reason:', response.data.failedreason);
-
       res.status(400).json({
         message: response.data.failedreason || 'SSL Session failed',
-
         data: response.data,
       });
     }
   } catch (err) {
+    console.error('SSL Init Error:', err);
     res.status(500).json({ message: 'SSL init failed', error: err.message });
   }
 };
