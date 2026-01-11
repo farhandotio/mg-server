@@ -3,35 +3,42 @@ import { body, validationResult } from 'express-validator';
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // সার্ভার লগে ডিটেইল এরর প্রিন্ট হবে
     console.error('❌ Validation Errors:', JSON.stringify(errors.array(), null, 2));
 
     return res.status(400).json({
       success: false,
-      message: errors.array()[0].msg, // ইউজারের জন্য সহজ মেসেজ
-      errors: errors.array(), // ডেভেলপারকে ডিবাগ করতে সাহায্য করবে
+      message: errors.array()[0].msg,
+      errors: errors.array(),
     });
   }
   next();
 };
 
 export const createOrderValidation = [
-  // ১. Order Items চেক
-  body('orderItems').isArray({ min: 1 }).withMessage('কার্ট খালি হতে পারবে না'),
-  body('orderItems.*.product').isMongoId().withMessage('প্রোডাক্ট আইডি সঠিক নয়'),
-  body('orderItems.*.quantity').isInt({ min: 1 }).withMessage('পরিমাণ সঠিক নয়'),
-  body('orderItems.*.price').isNumeric().withMessage('প্রোডাক্টের দাম সঠিক নয়'),
+  body('orderItems').isArray({ min: 1 }).withMessage('Cart cannot be empty'),
+  body('orderItems.*.product').isMongoId().withMessage('Invalid product ID format'),
+  body('orderItems.*.title').notEmpty().withMessage('Product title is required'),
+  body('orderItems.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+  body('orderItems.*.price').isNumeric().withMessage('Product price must be a number'),
+  body('orderItems.*.image').notEmpty().withMessage('Product image is required'),
 
-  // ২. Shipping Address (User Model অনুযায়ী)
-  body('shippingAddress.fullname').notEmpty().withMessage('নাম আবশ্যক'),
-  body('shippingAddress.phoneNumber').notEmpty().withMessage('ফোন নম্বর আবশ্যক'),
-  body('shippingAddress.address').notEmpty().withMessage('ঠিকানা আবশ্যক'),
-  body('shippingAddress.city').notEmpty().withMessage('শহর আবশ্যক'),
-  body('shippingAddress.area').notEmpty().withMessage('এলাকা বা স্টেট আবশ্যক'),
+  // 2. Shipping Address (Matches Order model fields)
+  body('shippingAddress.phone').notEmpty().withMessage('Phone number is required'),
+  body('shippingAddress.street').notEmpty().withMessage('Street address or details are required'),
+  body('shippingAddress.city').notEmpty().withMessage('City is required'),
+  body('shippingAddress.state').notEmpty().withMessage('State or Division is required'),
+  body('shippingAddress.zip').notEmpty().withMessage('ZIP code is required'),
+  body('shippingAddress.country').notEmpty().withMessage('Country name is required'),
 
-  // ৩. Payment & Pricing
-  body('payment.method').isIn(['COD', 'ONLINE']).withMessage('পেমেন্ট মেথড ভুল'),
-  body('pricing.totalPrice').isFloat({ min: 0 }).withMessage('সর্বমোট দাম ভুল'),
+  // 3. Payment Method
+  body('payment.method')
+    .isIn(['COD', 'ONLINE'])
+    .withMessage('Invalid payment method. Choose COD or ONLINE'),
+
+  // 4. Pricing Object
+  body('pricing.itemsPrice').isNumeric().withMessage('Items subtotal must be a number'),
+  body('pricing.shippingPrice').isNumeric().withMessage('Shipping cost must be a number'),
+  body('pricing.totalPrice').isFloat({ min: 0 }).withMessage('Total price must be a valid number'),
 
   validate,
 ];
