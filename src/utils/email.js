@@ -1,7 +1,6 @@
 import nodemailer from 'nodemailer';
 
 const sendEmail = async (options) => {
-  // ১. Transporter তৈরি করা
   const transporter = nodemailer.createTransport({
     service: 'Gmail',
     auth: {
@@ -10,11 +9,10 @@ const sendEmail = async (options) => {
     },
   });
 
-  // ২. প্রফেশনাল HTML টেম্পলেট (ই-কমার্সের উপযোগী)
   const htmlTemplate = `
     <div style="max-width: 600px; margin: 20px auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
       <div style="background-color: #111; padding: 25px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">MY GADGET</h1>
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">Gadget BDS</h1>
       </div>
       <div style="padding: 30px; background-color: #ffffff; color: #333;">
         <h2 style="color: #111; margin-top: 0;">${options.subject}</h2>
@@ -41,14 +39,14 @@ const sendEmail = async (options) => {
         <p style="font-size: 14px; color: #888;">If you didn't request this, please ignore this email.</p>
       </div>
       <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #aaa;">
-        &copy; ${new Date().getFullYear()} My Gadget Store. All rights reserved.
+        &copy; ${new Date().getFullYear()} Gadget BDS Store. All rights reserved.
       </div>
     </div>
   `;
 
   // ৩. ইমেইল অপশন কনফিগার করা
   const mailOptions = {
-    from: process.env.EMAIL_FROM || '"My Gadget" <noreply@mygadget.com>',
+    from: process.env.EMAIL_FROM || '"Gadget BDS" <noreply@mygadget.com>',
     to: options.email,
     subject: options.subject,
     text: options.message,

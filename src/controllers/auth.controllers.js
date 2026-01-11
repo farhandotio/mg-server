@@ -9,51 +9,109 @@ import sendEmail from '../utils/email.js';
 export const register = async (req, res) => {
   try {
     const { fullname, email, password } = req.body;
-    console.log('Request Body:', req.body);
+
     const isUserExist = await userModel.findOne({ email: email.toLowerCase() });
     if (isUserExist) return res.status(409).json({ message: 'Email already exists.' });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = await userModel.create({ email: email.toLowerCase(), fullname, password: hash });
+
+    const user = await userModel.create({
+      email: email.toLowerCase(),
+      fullname,
+      password: hash,
+    });
+
+    const verificationToken = user.createEmailVerificationToken();
+    await user.save({ validateBeforeSave: false });
+
+    const verificationUrl = `${req.protocol}://${req.get(
+      'host'
+    )}/api/auth/verify-email/${verificationToken}`;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Verify your account - Gadget BDS',
+        message: `Hi ${fullname}, Please verify your account to complete registration.`,
+        buttonText: 'Verify Account',
+        buttonUrl: verificationUrl,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Registration successful! Please check your email to verify your account.',
+      });
+    } catch (emailError) {
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      return res
+        .status(500)
+        .json({ message: 'Could not send verification email. Please try again later.' });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const verifyEmail = async (req, res) => {
+  try {
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const user = await userModel.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.redirect(`${process.env.FRONTEND_URL}/login?status=error&message=invalid_token`);
+    }
+
+    user.isVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET_KEY, {
       expiresIn: '7d',
     });
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'none',
-      path: '/', 
-    });
+     res.cookie('token', token, {
+       httpOnly: true,
+       secure: process.env.NODE_ENV === 'production',
+       maxAge: 7 * 24 * 60 * 60 * 1000,
+       sameSite: 'none',
+       path: '/',
+     });
 
-    await sendEmail({
-      email: user.email,
-      subject: 'Welcome to My Gadget!',
-      message: `Hi ${fullname}, welcome to our store!`,
-    });
-
-    res.status(201).json({
-      success: true,
-      user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
-    });
+    return res.redirect(`${process.env.FRONTEND_URL}/?status=success&message=verified`);
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    res.redirect(`${process.env.FRONTEND_URL}/login?status=error&message=server_error`);
   }
 };
 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
     const user = await userModel.findOne({ email }).select('+password');
+
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    if (!user.isVerified) {
+      return res.status(401).json({
+        message: 'Your account is not verified. Please check your email.',
+        isVerified: false,
+      });
     }
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET_KEY, {
       expiresIn: '7d',
     });
+
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -101,7 +159,7 @@ export const forgotPassword = async (req, res) => {
     user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
-    const resetURL = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+    const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
     await sendEmail({
       email: user.email,
       subject: 'Password Reset Request',
@@ -181,7 +239,6 @@ export const addAddress = async (req, res) => {
   try {
     const { phone, street, city, state, zip, country, isDefault } = req.body;
 
-    // যদি এটি ডিফল্ট অ্যাড্রেস হয়, তবে বাকি সবগুলোকে false করে দিন
     if (isDefault) {
       await userModel.updateOne(
         { _id: req.user.id },
@@ -199,7 +256,6 @@ export const addAddress = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // ফ্রন্টএন্ড রেডাক্স যেন ঠিকমতো ডাটা পায় তাই সরাসরি addresses পাঠানো হচ্ছে
     res.status(201).json({ success: true, addresses: user.addresses });
   } catch (err) {
     console.error('Add Address Error:', err);
@@ -207,7 +263,6 @@ export const addAddress = async (req, res) => {
   }
 };
 
-// এই ফাংশনটি মিসিং ছিল (Exported)
 export const updateAddress = async (req, res) => {
   try {
     const user = await userModel.findOneAndUpdate(
@@ -221,7 +276,6 @@ export const updateAddress = async (req, res) => {
   }
 };
 
-// এই ফাংশনটি মিসিং ছিল (Exported)
 export const setDefaultAddress = async (req, res) => {
   try {
     await userModel.updateOne({ _id: req.user.id }, { $set: { 'addresses.$[].isDefault': false } });
@@ -250,6 +304,7 @@ export const deleteAddress = async (req, res) => {
 };
 
 /** --- ADMIN --- **/
+
 export const allUsers = async (req, res) => {
   try {
     const users = await userModel.find();
