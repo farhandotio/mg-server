@@ -14,12 +14,15 @@ export const createProduct = async (req, res) => {
       stock,
       category,
       brand,
+      affiliateLink,
       sku,
       productType,
       tags,
       specifications,
-      images, 
+      images,
     } = req.body;
+
+    const isAffiliate = affiliateLink !== '';
 
     // ১. ইমেজ চেক (এখন req.files না দেখে req.body.images দেখব)
     if (!images || !Array.isArray(images) || images.length === 0) {
@@ -63,6 +66,8 @@ export const createProduct = async (req, res) => {
       shortDescription,
       category,
       brand,
+      affiliateLink,
+      isAffiliate,
       stock: Number(stock),
       sku: sku ? sku.toUpperCase() : `SKU-${Date.now()}`,
       productType,
@@ -115,7 +120,7 @@ export const getAllProducts = async (req, res) => {
       brand,
       sort,
       search,
-      'price.base[lte]': maxPrice, 
+      'price.base[lte]': maxPrice,
     } = req.query;
 
     let query = { status: 'Published' };
@@ -134,16 +139,16 @@ export const getAllProducts = async (req, res) => {
       query['price.base'] = { $lte: Number(maxPrice) };
     }
 
-    let sortQuery = { createdAt: -1 }; 
+    let sortQuery = { createdAt: -1 };
     if (sort) {
       if (sort === 'price.base') sortQuery = { 'price.base': 1 };
       else if (sort === '-price.base') sortQuery = { 'price.base': -1 };
       else if (sort === '-sold') sortQuery = { sold: -1 };
-      else sortQuery = { [sort]: -1 }; 
+      else sortQuery = { [sort]: -1 };
     }
 
     const skip = (Number(page) - 1) * Number(limit);
-    
+
     const [products, totalProducts] = await Promise.all([
       productModel
         .find(query)
@@ -152,18 +157,18 @@ export const getAllProducts = async (req, res) => {
         .sort(sortQuery)
         .limit(Number(limit))
         .skip(skip),
-      productModel.countDocuments(query)
+      productModel.countDocuments(query),
     ]);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       products,
       pagination: {
         totalProducts,
         totalPages: Math.ceil(totalProducts / Number(limit)),
         currentPage: Number(page),
-        limit: Number(limit)
-      }
+        limit: Number(limit),
+      },
     });
   } catch (err) {
     console.error('Fetch Error:', err);

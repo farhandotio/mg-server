@@ -70,15 +70,11 @@ export const productValidation = [
     .isInt({ min: 0 })
     .withMessage('Stock cannot be negative'),
 
-  body('sku')
-    .trim()
-    .notEmpty()
-    .withMessage('SKU is required')
-    .toUpperCase(),
+  body('sku').trim().notEmpty().withMessage('SKU is required').toUpperCase(),
 
   body('productType')
     .optional()
-    .isIn(['Regular', 'FlashSale', "HotDeals", 'Featured', 'BestSeller', 'NewArrival'])
+    .isIn(['Regular', 'FlashSale', 'HotDeals', 'Featured', 'BestSeller', 'NewArrival'])
     .withMessage('Invalid product type'),
 
   body('status')

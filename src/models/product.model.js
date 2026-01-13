@@ -76,6 +76,10 @@ const productSchema = new mongoose.Schema(
       enum: ['Draft', 'Published', 'OutOfStock', 'Archived'],
       default: 'Published',
     },
+
+    affiliateLink: String,
+    isAffiliate: false,
+
     // Data tracking
     sold: { type: Number, default: 0 },
     views: { type: Number, default: 0 }, // কতজন দেখেছে (Popularity track)
