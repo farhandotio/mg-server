@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { boolean } from 'zod';
 
 const productSchema = new mongoose.Schema(
   {
@@ -78,7 +79,10 @@ const productSchema = new mongoose.Schema(
     },
 
     affiliateLink: String,
-    isAffiliate: false,
+    isAffiliate: {
+      type: boolean,
+      default: false
+    },
 
     // Data tracking
     sold: { type: Number, default: 0 },
