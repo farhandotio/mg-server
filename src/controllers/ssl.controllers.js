@@ -113,7 +113,6 @@ export const initSSLPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
 
-    // populate user for getting customer email
     const order = await Order.findById(orderId).populate('user');
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -122,7 +121,7 @@ export const initSSLPayment = async (req, res) => {
       return res.status(400).json({ message: 'Order already paid' });
     }
 
-    const tran_id = `TXN_${uuidv4()}`;
+    const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`; // ছোট এবং ক্লিন আইডি
 
     const payload = {
       store_id: process.env.SSLCOMMERZ_STORE_ID,
@@ -135,27 +134,27 @@ export const initSSLPayment = async (req, res) => {
       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
 
-      // কাস্টমার ইনফো (আপনার নতুন মডেল অনুযায়ী ম্যাপিং)
-      cus_name: order.user?.fullname || order.user?.name || 'Customer', // User model অনুযায়ী
+      // কাস্টমার ইনফো (আপনার ফ্রন্টএন্ডের সাথে ১০০% ম্যাচিং)
+      cus_name: order.user?.fullname || 'Customer', 
       cus_email: order.user?.email || 'customer@email.com',
-      cus_phone: order.shippingAddress.phone, // Model mapping: phone
-      cus_add1: order.shippingAddress.street, // Model mapping: street
-      cus_city: order.shippingAddress.city,
-      cus_state: order.shippingAddress.state,
-      cus_postcode: order.shippingAddress.zip,
+      cus_phone: order.shippingAddress.phone || '01XXXXXXXXX', 
+      cus_add1: order.shippingAddress.street || 'N/A', 
+      cus_city: order.shippingAddress.city || 'Dhaka',
+      cus_state: order.shippingAddress.state || 'Dhaka',
+      cus_postcode: order.shippingAddress.zip || '1000',
       cus_country: order.shippingAddress.country || 'Bangladesh',
 
-      // শিপিং ইনফো
+      // শিপিং ইনফো (একই রাখা হয়েছে)
       ship_name: order.user?.fullname || 'Customer',
       ship_add1: order.shippingAddress.street,
       ship_city: order.shippingAddress.city,
       ship_state: order.shippingAddress.state,
       ship_postcode: order.shippingAddress.zip,
-      ship_country: order.shippingAddress.country,
+      ship_country: order.shippingAddress.country || 'Bangladesh',
 
       shipping_method: 'Courier',
       product_name: 'Gadget BDS Order',
-      product_category: 'General',
+      product_category: 'Electronics',
       product_profile: 'general',
     };
 
@@ -165,7 +164,8 @@ export const initSSLPayment = async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    if (response.data?.status === 'SUCCESS') {
+    // SSLCOMMERZ থেকে আসা রেসপন্স চেক
+    if (response.data?.status === 'SUCCESS' && response.data?.GatewayPageURL) {
       order.payment.transactionId = tran_id;
       order.payment.provider = 'SSLCOMMERZ';
       await order.save();
@@ -175,15 +175,14 @@ export const initSSLPayment = async (req, res) => {
         gatewayUrl: response.data.GatewayPageURL,
       });
     } else {
-      console.log('SSL Failed Reason:', response.data.failedreason);
       res.status(400).json({
-        message: response.data.failedreason || 'SSL Session failed',
+        message: response.data?.failedreason || 'SSL Session creation failed',
         data: response.data,
       });
     }
   } catch (err) {
     console.error('SSL Init Error:', err);
-    res.status(500).json({ message: 'SSL init failed', error: err.message });
+    res.status(500).json({ message: 'Internal Server Error during payment init' });
   }
 };
 
