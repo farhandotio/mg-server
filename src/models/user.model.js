@@ -26,6 +26,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    image: {
+      type: String, 
+      default: '', 
+    },
+    phone: {
+      type: String,
+      default: '',
+    },
     password: {
       type: String,
       required: true,
@@ -38,7 +46,7 @@ const userSchema = new mongoose.Schema(
     },
     isVerified: {
       type: Boolean,
-      default: false, 
+      default: false,
     },
     emailVerificationToken: String,
     emailVerificationExpires: Date,
