@@ -120,6 +120,7 @@ export const getAllProducts = async (req, res) => {
       brand,
       sort,
       search,
+      productType,
       'price.base[lte]': maxPrice,
     } = req.query;
 
@@ -131,9 +132,9 @@ export const getAllProducts = async (req, res) => {
         { tags: { $regex: search, $options: 'i' } },
       ];
     }
-
     if (category) query.category = category;
     if (brand) query.brand = brand;
+    if (productType) query.productType = productType;
 
     if (maxPrice) {
       query['price.base'] = { $lte: Number(maxPrice) };

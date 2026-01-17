@@ -1,5 +1,5 @@
 import brandModel from '../models/brand.model.js';
-import { deleteFile } from '../utils/imageKit.js'; // পাথ নিশ্চিত করে নিন
+import { deleteFile } from '../utils/imageKit.js';
 
 // ১. CREATE BRAND
 export const createBrand = async (req, res) => {
@@ -7,7 +7,7 @@ export const createBrand = async (req, res) => {
     const { name, status, image } = req.body;
 
     if (!image || !image.url) {
-      return res.status(400).json({ message: 'Brand logo/image is required' });
+      return res.status(400).json({ message: 'Brand logo/image URL is required' });
     }
 
     const slug = name.toLowerCase().split(' ').join('-');
@@ -15,13 +15,13 @@ export const createBrand = async (req, res) => {
     const brand = await brandModel.create({
       name,
       slug,
-      image,
-      status,
+      image, // Expecting { url, fileId }
+      status: status || 'ACTIVE',
     });
 
-    res.status(201).json({ success: true, message: 'Brand created!', brand });
+    res.status(201).json({ success: true, message: 'Brand identity established!', brand });
   } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ message: 'Brand name already exists' });
+    if (err.code === 11000) return res.status(400).json({ message: 'Brand already exists' });
     res.status(500).json({ message: err.message || 'Server error' });
   }
 };
@@ -30,34 +30,40 @@ export const createBrand = async (req, res) => {
 export const updateBrand = async (req, res) => {
   try {
     const { name, status, image } = req.body;
-    let updateData = { status };
+    let updateData = {};
 
+    if (status) updateData.status = status;
     if (name) {
       updateData.name = name;
       updateData.slug = name.toLowerCase().split(' ').join('-');
     }
 
-    // যদি ফ্রন্টেন্ড থেকে নতুন ইমেজ ডাটা পাঠানো হয়
-    if (image && image.fileId) {
+    // ইমেজ আপডেট লজিক (URL ভিত্তিক আপডেট সাপোর্ট করে)
+    if (image && image.url) {
       const brand = await brandModel.findById(req.params.id);
+      if (!brand) return res.status(404).json({ message: 'Brand not found' });
 
-      // পুরনো ইমেজ ডিলিট করা
-      if (brand?.image?.fileId) {
-        await deleteFile(brand.image.fileId);
+      // যদি নতুন ইউআরএল পুরনো ইউআরএল থেকে আলাদা হয়
+      if (image.url !== brand.image?.url) {
+        // নতুন ইমেজে fileId থাকলে এবং পুরনোটাতেও থাকলে তবেই ডিলিট হবে (ImageKit Integration)
+        if (brand.image?.fileId && image.fileId) {
+          try {
+            await deleteFile(brand.image.fileId);
+          } catch (error) {
+            console.log('ImageKit file cleanup skipped or failed.');
+          }
+        }
+        updateData.image = image;
       }
-
-      updateData.image = image; // নতুন ইমেজ ডাটা সেট করা
     }
 
     const updatedBrand = await brandModel.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
-    if (!updatedBrand) return res.status(404).json({ message: 'Brand not found' });
-
-    res.json({ success: true, message: 'Brand updated!', brand: updatedBrand });
+    res.json({ success: true, message: 'Brand updated successfully!', brand: updatedBrand });
   } catch (err) {
     res.status(500).json({ message: err.message || 'Server error' });
   }
@@ -69,25 +75,29 @@ export const deleteBrand = async (req, res) => {
     const brand = await brandModel.findById(req.params.id);
     if (!brand) return res.status(404).json({ message: 'Brand not found' });
 
-    // ইমেজকিট থেকে লোগো ডিলিট করা
+    // ইমেজকিট থেকে ফাইল ক্লিনআপ
     if (brand.image?.fileId) {
-      await deleteFile(brand.image.fileId);
+      try {
+        await deleteFile(brand.image.fileId);
+      } catch (error) {
+        console.log('Cleanup failed during deletion.');
+      }
     }
 
     await brandModel.findByIdAndDelete(req.params.id);
 
-    res.json({ success: true, message: 'Brand deleted successfully' });
+    res.json({ success: true, message: 'Brand purged from terminal' });
   } catch (err) {
     res.status(500).json({ message: err.message || 'Server error' });
   }
 };
 
-// ৪. GET ALL BRANDS (আগের মতোই থাকবে)
+// ৪. GET ALL BRANDS
 export const getAllBrands = async (req, res) => {
   try {
     const brands = await brandModel.find().sort({ createdAt: -1 });
     res.json({ success: true, brands });
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };
