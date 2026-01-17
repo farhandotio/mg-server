@@ -3,14 +3,122 @@ import { deleteFile } from '../utils/imageKit.js';
 import slugify from 'slugify';
 
 // 1. Create
+// export const createProduct = async (req, res) => {
+//   try {
+//     const {
+//       title,
+//       description,
+//       shortDescription,
+//       price,
+//       offer,
+//       stock,
+//       category,
+//       brand,
+//       affiliateLink = '',
+//       sku,
+//       productType,
+//       tags,
+//       specifications,
+//       images,
+//     } = req.body;
+
+//     const isAffiliate = affiliateLink !== '';
+
+//     // 1️⃣ Image validation
+//     if (!Array.isArray(images) || images.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'At least one product image is required',
+//       });
+//     }
+
+//     // 2️⃣ Safe JSON parser
+//     const parseData = (data) => {
+//       if (!data) return undefined;
+//       if (typeof data === 'object') return data;
+//       try {
+//         return JSON.parse(data);
+//       } catch {
+//         return undefined;
+//       }
+//     };
+
+//     const finalPrice = parseData(price);
+//     const finalOffer = parseData(offer);
+//     const finalSpecs = parseData(specifications);
+//     const finalTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()) : tags;
+
+//     // 3️⃣ Required price validation
+//     if (!finalPrice?.base || Number(finalPrice.base) <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Base price is required and must be greater than 0',
+//       });
+//     }
+
+//     // 4️⃣ Slug generate
+//     const slug = slugify(title, { lower: true, strict: true });
+
+//     // 5️⃣ Product object (NO DISCOUNT LOGIC HERE)
+//     const productData = {
+//       title,
+//       slug,
+//       description,
+//       shortDescription,
+//       category,
+//       brand,
+//       affiliateLink,
+//       isAffiliate,
+//       stock: Number(stock),
+//       sku: sku ? sku.toUpperCase() : `SKU-${Date.now()}`,
+//       productType,
+//       tags: finalTags,
+//       specifications: finalSpecs,
+//       price: {
+//         base: Number(finalPrice.base),
+//       },
+//       images,
+//     };
+
+//     // 6️⃣ Offer attach (optional)
+//     if (finalOffer?.percentage > 0) {
+//       productData.offer = {
+//         percentage: Number(finalOffer.percentage),
+//         deadline: finalOffer.deadline || null,
+//       };
+//     }
+
+//     const product = await productModel.create(productData);
+
+//     return res.status(201).json({
+//       success: true,
+//       message: 'Product created successfully!',
+//       product,
+//     });
+//   } catch (err) {
+//     if (err.code === 11000) {
+//       const field = Object.keys(err.keyValue)[0];
+//       return res.status(400).json({
+//         success: false,
+//         message: `${field.toUpperCase()} already exists.`,
+//       });
+//     }
+
+//     return res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// };
+
 export const createProduct = async (req, res) => {
   try {
     const {
       title,
       description,
       shortDescription,
-      price,
-      offer,
+      price, 
+      deadline, 
       stock,
       category,
       brand,
@@ -24,7 +132,7 @@ export const createProduct = async (req, res) => {
 
     const isAffiliate = affiliateLink !== '';
 
-    // 1️⃣ Image validation
+    // ১. ইমেজ ভ্যালিডেশন
     if (!Array.isArray(images) || images.length === 0) {
       return res.status(400).json({
         success: false,
@@ -32,7 +140,7 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    // 2️⃣ Safe JSON parser
+    // ২. সেফ ডাটা পার্সার (যদি স্ট্রিং হিসেবে আসে)
     const parseData = (data) => {
       if (!data) return undefined;
       if (typeof data === 'object') return data;
@@ -44,11 +152,10 @@ export const createProduct = async (req, res) => {
     };
 
     const finalPrice = parseData(price);
-    const finalOffer = parseData(offer);
     const finalSpecs = parseData(specifications);
     const finalTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()) : tags;
 
-    // 3️⃣ Required price validation
+    // ৩. প্রাইস ভ্যালিডেশন
     if (!finalPrice?.base || Number(finalPrice.base) <= 0) {
       return res.status(400).json({
         success: false,
@@ -56,10 +163,10 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    // 4️⃣ Slug generate
+    // ৪. স্লাগ জেনারেট
     const slug = slugify(title, { lower: true, strict: true });
 
-    // 5️⃣ Product object (NO DISCOUNT LOGIC HERE)
+    // ৫. প্রোডাক্ট ডাটা প্রিপেয়ার
     const productData = {
       title,
       slug,
@@ -76,17 +183,14 @@ export const createProduct = async (req, res) => {
       specifications: finalSpecs,
       price: {
         base: Number(finalPrice.base),
+        discounted: finalPrice.discounted ? Number(finalPrice.discounted) : Number(finalPrice.base),
+      },
+      offer: {
+        deadline: deadline || null, // ডেডলাইন সেভ হচ্ছে
+        // percentage এখানে পাঠানোর দরকার নেই, Schema-র pre-save থেকে ক্যালকুলেট হবে
       },
       images,
     };
-
-    // 6️⃣ Offer attach (optional)
-    if (finalOffer?.percentage > 0) {
-      productData.offer = {
-        percentage: Number(finalOffer.percentage),
-        deadline: finalOffer.deadline || null,
-      };
-    }
 
     const product = await productModel.create(productData);
 
