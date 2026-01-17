@@ -14,7 +14,7 @@ export const createProduct = async (req, res) => {
       stock,
       category,
       brand,
-      affiliateLink,
+      affiliateLink = '',
       sku,
       productType,
       tags,
@@ -24,21 +24,22 @@ export const createProduct = async (req, res) => {
 
     const isAffiliate = affiliateLink !== '';
 
-    // ১. ইমেজ চেক (এখন req.files না দেখে req.body.images দেখব)
-    if (!images || !Array.isArray(images) || images.length === 0) {
+    // 1️⃣ Image validation
+    if (!Array.isArray(images) || images.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'At least one product image is required',
       });
     }
 
-    // ২. ডাটা পার্সিং (ফ্রন্টেন্ড থেকে JSON হিসেবে পাঠালে parseData দরকার হয় না, তবুও সেফটি হিসেবে রাখা হলো)
+    // 2️⃣ Safe JSON parser
     const parseData = (data) => {
       if (!data) return undefined;
+      if (typeof data === 'object') return data;
       try {
-        return typeof data === 'string' ? JSON.parse(data) : data;
-      } catch (e) {
-        return data;
+        return JSON.parse(data);
+      } catch {
+        return undefined;
       }
     };
 
@@ -47,18 +48,18 @@ export const createProduct = async (req, res) => {
     const finalSpecs = parseData(specifications);
     const finalTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()) : tags;
 
-    // ৩. ডিসকাউন্টেড প্রাইস লজিক
-    let discountedAmount = finalPrice?.base || 0;
-    if (finalOffer && finalOffer.percentage > 0) {
-      discountedAmount = Math.round(
-        finalPrice.base - (finalPrice.base * finalOffer.percentage) / 100
-      );
+    // 3️⃣ Required price validation
+    if (!finalPrice?.base || Number(finalPrice.base) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Base price is required and must be greater than 0',
+      });
     }
 
-    // ৪. স্লাগ জেনারেট
+    // 4️⃣ Slug generate
     const slug = slugify(title, { lower: true, strict: true });
 
-    // ৫. প্রোডাক্ট অবজেক্ট তৈরি
+    // 5️⃣ Product object (NO DISCOUNT LOGIC HERE)
     const productData = {
       title,
       slug,
@@ -74,22 +75,22 @@ export const createProduct = async (req, res) => {
       tags: finalTags,
       specifications: finalSpecs,
       price: {
-        base: finalPrice?.base,
-        discounted: discountedAmount,
+        base: Number(finalPrice.base),
       },
-      images, // ইমেজগুলো এখন সরাসরি ডাটাবেসে সেভ হবে
+      images,
     };
 
-    if (finalOffer && finalOffer.percentage > 0) {
+    // 6️⃣ Offer attach (optional)
+    if (finalOffer?.percentage > 0) {
       productData.offer = {
-        percentage: finalOffer.percentage,
+        percentage: Number(finalOffer.percentage),
         deadline: finalOffer.deadline || null,
       };
     }
 
     const product = await productModel.create(productData);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Product created successfully!',
       product,
@@ -103,7 +104,7 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });

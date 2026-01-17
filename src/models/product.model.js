@@ -80,8 +80,8 @@ const productSchema = new mongoose.Schema(
 
     affiliateLink: String,
     isAffiliate: {
-      type: boolean,
-      default: false
+      type: Boolean,
+      default: false,
     },
 
     // Data tracking
