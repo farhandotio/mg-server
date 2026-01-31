@@ -3,6 +3,32 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import sendEmail from '../utils/email.js';
+import { redisClient } from '../config/redis.js';
+
+// Cookie options helper function jate bar bar likhte na hoy
+const setAuthCookies = async (res, user) => {
+  const accessToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_ACCESS_KEY, {
+    expiresIn: '15m',
+  });
+
+  const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_KEY, { expiresIn: '7d' });
+
+  await redisClient.set(`refresh_token:${user._id}`, refreshToken, {
+    EX: 7 * 24 * 60 * 60,
+  });
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/',
+  };
+
+  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+  res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+  return { accessToken, refreshToken };
+};
 
 /** --- AUTHENTICATION --- **/
 
@@ -73,20 +99,11 @@ export const verifyEmail = async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET_KEY, {
-      expiresIn: '7d',
-    });
-
-     res.cookie('token', token, {
-       httpOnly: true,
-       secure: process.env.NODE_ENV === 'production',
-       maxAge: 7 * 24 * 60 * 60 * 1000,
-       sameSite: 'none',
-       path: '/',
-     });
+    await setAuthCookies(res, user);
 
     return res.redirect(`${process.env.FRONTEND_URL}/?status=success&message=verified`);
   } catch (err) {
+    console.error(err);
     res.redirect(`${process.env.FRONTEND_URL}/login?status=error&message=server_error`);
   }
 };
@@ -94,7 +111,6 @@ export const verifyEmail = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const user = await userModel.findOne({ email }).select('+password');
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -108,42 +124,70 @@ export const login = async (req, res) => {
       });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET_KEY, {
-      expiresIn: '7d',
-    });
-
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'none',
-      path: '/',
-    });
+    await setAuthCookies(res, user);
 
     res.status(200).json({
       success: true,
       user: { id: user._id, email: user.email, fullname: user.fullname, role: user.role },
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
   try {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      path: '/',
-    });
+    const refreshToken = req.cookies?.refreshToken;
 
-    return res.status(200).json({
-      success: true,
-      message: 'Logged out successfully',
+    if (refreshToken) {
+      const decoded = jwt.decode(refreshToken);
+      if (decoded) {
+        await redisClient.del(`refresh_token:${decoded.id}`);
+      }
+    }
+
+    res.clearCookie('accessToken', { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
+    res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
+
+    res.status(200).json({ message: 'Logged out' });
+  } catch (err) {
+    res.status(500).json({ message: 'Logout failed' });
+  }
+};
+
+export const refresh = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
+
+    jwt.verify(refreshToken, process.env.JWT_REFRESH_KEY, async (err, decoded) => {
+      if (err) return res.status(403).json({ message: 'Invalid token' });
+
+      // Redis theke check koro
+      const storedToken = await redisClient.get(`refresh_token:${decoded.id}`);
+
+      // Token jodi Redis-e na thake ba match na kore
+      if (!storedToken || storedToken !== refreshToken) {
+        return res.status(403).json({ message: 'Session expired, please login again' });
+      }
+
+      const newAccessToken = jwt.sign({ id: decoded.id }, process.env.JWT_ACCESS_KEY, {
+        expiresIn: '15m',
+      });
+
+      res.cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        maxAge: 15 * 60 * 1000,
+        path: '/',
+      });
+
+      res.status(200).json({ success: true });
     });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Logout failed' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

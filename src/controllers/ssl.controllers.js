@@ -121,7 +121,7 @@ export const initSSLPayment = async (req, res) => {
       return res.status(400).json({ message: 'Order already paid' });
     }
 
-    const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`; // ছোট এবং ক্লিন আইডি
+    const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`; 
 
     const payload = {
       store_id: process.env.SSLCOMMERZ_STORE_ID,
@@ -134,7 +134,7 @@ export const initSSLPayment = async (req, res) => {
       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
 
-      // কাস্টমার ইনফো (আপনার ফ্রন্টএন্ডের সাথে ১০০% ম্যাচিং)
+      
       cus_name: order.user?.fullname || 'Customer', 
       cus_email: order.user?.email || 'customer@email.com',
       cus_phone: order.shippingAddress.phone || '01XXXXXXXXX', 
@@ -144,7 +144,7 @@ export const initSSLPayment = async (req, res) => {
       cus_postcode: order.shippingAddress.zip || '1000',
       cus_country: order.shippingAddress.country || 'Bangladesh',
 
-      // শিপিং ইনফো (একই রাখা হয়েছে)
+      
       ship_name: order.user?.fullname || 'Customer',
       ship_add1: order.shippingAddress.street,
       ship_city: order.shippingAddress.city,
@@ -164,7 +164,7 @@ export const initSSLPayment = async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    // SSLCOMMERZ থেকে আসা রেসপন্স চেক
+    
     if (response.data?.status === 'SUCCESS' && response.data?.GatewayPageURL) {
       order.payment.transactionId = tran_id;
       order.payment.provider = 'SSLCOMMERZ';

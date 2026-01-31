@@ -10,10 +10,15 @@ router.post('/register', validators.registerUserValidations, controller.register
 router.get('/verify-email/:token', controller.verifyEmail);
 router.post('/login', validators.loginUserValidations, controller.login);
 router.post('/logout', controller.logout);
+router.post('/refresh-token', controller.refresh);
 
 // PASSWORD MANAGEMENT
-router.post("/forgot-password", validators.forgotPasswordValidation, controller.forgotPassword);
-router.patch("/reset-password/:token", validators.resetPasswordValidation, controller.resetPassword);
+router.post('/forgot-password', validators.forgotPasswordValidation, controller.forgotPassword);
+router.patch(
+  '/reset-password/:token',
+  validators.resetPasswordValidation,
+  controller.resetPassword
+);
 router.patch('/update-my-password', middleware.requireAuth, controller.updatePassword);
 
 // USER PROFILE
