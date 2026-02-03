@@ -32,4 +32,7 @@ router.patch('/admin/status/:id', requireAuth, isAdmin, controller.updateOrderSt
 // ৭. পেমেন্ট স্ট্যাটাস ম্যানুয়ালি আপডেট করা (যদি ক্যাশ অন ডেলিভারি হয়)
 router.patch('/admin/payment-status/:id', requireAuth, isAdmin, controller.updatePaymentStatus);
 
+// ৮. অ্যাডমিন অর্ডার ডিলিট করবে (সতর্কতা: এটি পার্মানেন্টলি ডিলিট করবে)
+router.delete('/admin/delete/:id', requireAuth, isAdmin, controller.deleteOrderAdmin);
+
 export default router;

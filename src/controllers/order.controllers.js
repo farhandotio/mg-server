@@ -101,7 +101,7 @@ export const createSingleOrder = async (req, res) => {
 
     // ৩. প্রাইসিং ক্যালকুলেশন
     const shippingPrice = shippingAddress.city.toLowerCase() === 'dhaka' ? 80 : 150;
-    
+
     // আইটেমের মোট দাম: quantity * price
     const itemsPrice = orderItem.price * orderItem.quantity;
     const totalPrice = itemsPrice + shippingPrice;
@@ -109,13 +109,15 @@ export const createSingleOrder = async (req, res) => {
     // ৪. অর্ডার তৈরি
     const order = await orderModel.create({
       user: userId,
-      orderItems: [{
-        product: orderItem.product,
-        title: orderItem.title,
-        quantity: orderItem.quantity,
-        price: orderItem.price,
-        image: orderItem.image || '',
-      }],
+      orderItems: [
+        {
+          product: orderItem.product,
+          title: orderItem.title,
+          quantity: orderItem.quantity,
+          price: orderItem.price,
+          image: orderItem.image || '',
+        },
+      ],
       shippingAddress: {
         phone: shippingAddress.phone,
         street: shippingAddress.street,
@@ -204,7 +206,7 @@ export const getAllOrdersAdmin = async (req, res) => {
   try {
     const orders = await orderModel
       .find()
-      .populate('user', 'name email phoneNumber')
+      .populate('user', 'fullname email phoneNumber')
       .sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (err) {
@@ -261,5 +263,44 @@ export const updatePaymentStatus = async (req, res) => {
     res.json({ success: true, message: 'Payment status updated' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ৮. Delete Order (Admin Only) with Security Checks
+export const deleteOrderAdmin = async (req, res) => {
+  try {
+    const order = await orderModel.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'অর্ডারটি খুঁজে পাওয়া যায়নি।' });
+    }
+
+    const restrictedStatuses = ['SHIPPED', 'DELIVERED', 'PROCESSING'];
+
+    if (restrictedStatuses.includes(order.orderStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `অর্ডারটি বর্তমানে ${order.orderStatus} অবস্থায় আছে, তাই এটি ডিলিট করা সম্ভব নয়।`,
+      });
+    }
+
+    if (order.payment.status === 'PAID' && order.orderStatus !== 'CANCELLED') {
+      return res.status(400).json({
+        success: false,
+        message: 'পেমেন্ট করা অর্ডার ডিলিট করা যাবে না। প্রথমে এটি বাতিল (Cancel) করুন।',
+      });
+    }
+
+    await orderModel.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'অর্ডারটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলা হয়েছে।',
+    });
+  } catch (err) {
+    console.error('🔥 Order Delete Error:', err);
+    res
+      .status(500)
+      .json({ success: false, message: 'সার্ভার ত্রুটি: অর্ডার ডিলিট করা সম্ভব হয়নি।' });
   }
 };
