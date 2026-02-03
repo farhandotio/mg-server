@@ -10,6 +10,8 @@ const router = express.Router();
 // ১. চেকআউট শেষ করে অর্ডার তৈরি করা (এটিই মূল Checkout endpoint)
 router.post('/create', requireAuth, createOrderValidation, controller.createOrder);
 
+router.post('/create-single', requireAuth, controller.createSingleOrder);
+
 // ২. ইউজারের নিজের সব অর্ডার লিস্ট দেখা
 router.get('/my-orders', requireAuth, controller.myOrders);
 
