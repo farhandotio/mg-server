@@ -3,14 +3,27 @@ import app from './src/app.js';
 import connectDB from './src/config/db.js';
 import { connectRedis } from './src/config/redis.js';
 
-connectDB().catch((err) => console.error('❌ DB Error:', err));
-// connectRedis().catch((err) => console.error('❌ Redis Error:', err));
+const initConnections = async () => {
+  try {
+    await connectDB();
+    console.log('✅ MongoDB Connected');
+  } catch (err) {
+    console.error('❌ MongoDB Error:', err.message);
+  }
+
+  try {
+    await connectRedis();
+    console.log('✅ Redis Connected');
+  } catch (err) {
+    console.error('❌ Redis Error:', err.message);
+  }
+};
+
+initConnections();
 
 if (process.env.NODE_ENV !== 'production') {
   const port = process.env.PORT || 5000;
-  app.listen(port, () => {
-    console.log(`🚀 Local Server: http://localhost:${port}`);
-  });
+  app.listen(port, () => console.log(`🚀 Port: ${port}`));
 }
 
 export default app;
