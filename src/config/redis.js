@@ -2,32 +2,32 @@ import { createClient } from 'redis';
 
 const redisUrl = process.env.REDIS_URL;
 
-if (!redisUrl) {
-  console.warn('⚠️ Missing REDIS_URL. Redis features will be disabled.');
-}
-
 export const redisClient = createClient({
   url: redisUrl,
   socket: {
-    reconnectStrategy: (retries) => {
-      if (retries > 5) return new Error('Redis connection failed');
-      return Math.min(retries * 100, 3000);
-    },
     connectTimeout: 5000,
   },
 });
 
-redisClient.on('error', (err) => console.log('❌ Redis Client Error:', err.message));
+redisClient.on('error', (err) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error('❌ Redis Client Error:', err.message);
+  }
+});
 
 export const connectRedis = async () => {
-  if (!redisUrl) return;
+  if (!redisUrl) return null;
 
   try {
-    if (redisClient.isOpen) return;
+    if (redisClient.isOpen || redisClient.isReady) {
+      return redisClient;
+    }
 
     await redisClient.connect();
-    console.log('✅ Redis connected successfully');
+    console.log('✅ Redis Connected');
+    return redisClient;
   } catch (error) {
     console.error('❌ Redis Connection Failed:', error.message);
+    return null; 
   }
 };

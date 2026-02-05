@@ -1,34 +1,43 @@
 import mongoose from 'mongoose';
 
-let cachedPromise = null;
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  throw new Error('Please define the MONGO_URI environment variable');
+}
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 async function connectDB() {
-  if (mongoose.connection.readyState === 1) {
-    return Promise.resolve();
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  if (cachedPromise) {
-    return cachedPromise;
-  }
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+      maxPoolSize: 10,
+    };
 
-  const opts = {
-    bufferCommands: false,
-    maxPoolSize: 10, 
-  };
-
-  cachedPromise = mongoose
-    .connect(process.env.MONGO_URI, opts)
-    .then((mongoose) => {
-      console.log('✅ MongoDB connected successfully!');
+    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+      console.log('✅ MongoDB Connected');
       return mongoose;
-    })
-    .catch((error) => {
-      console.error('❌ Database connection failed', error);
-      cachedPromise = null; 
-      throw error;
     });
+  }
 
-  return cachedPromise;
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    console.error('❌ MongoDB Connection Error:', e);
+    throw e;
+  }
+
+  return cached.conn;
 }
 
 export default connectDB;
