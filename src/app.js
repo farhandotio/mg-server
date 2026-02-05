@@ -3,7 +3,6 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import morgan from 'morgan';
 
-// রুট ইমপোর্ট
 import authRoutes from './routes/auth.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import brandRoutes from './routes/brand.routes.js';
@@ -12,7 +11,6 @@ import cartRoutes from './routes/cart.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
-import { csrfProtection } from './middlewares/csrf.middleware.js';
 
 const app = express();
 
@@ -34,8 +32,6 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'Active', message: 'Server is breathing...' });
 });
 
-app.use(csrfProtection);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
@@ -46,7 +42,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/payment', paymentRoutes);
 
 app.use((err, req, res, next) => {
-  console.error('SERVER_ERROR:', err.stack);
+  console.error('SERVER_ERROR:', err.message);
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error',
