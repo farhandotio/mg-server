@@ -1,24 +1,34 @@
 import mongoose from 'mongoose';
 
-let isConnected = false;
+let cachedPromise = null;
 
 async function connectDB() {
-  if (isConnected) {
-    console.log('Using existing MongoDB connection');
-    return;
+  if (mongoose.connection.readyState === 1) {
+    return Promise.resolve();
   }
 
-  try {
-    const db = await mongoose.connect(process.env.MONGO_URI, {
-      bufferCommands: false,
+  if (cachedPromise) {
+    return cachedPromise;
+  }
+
+  const opts = {
+    bufferCommands: false,
+    maxPoolSize: 10, 
+  };
+
+  cachedPromise = mongoose
+    .connect(process.env.MONGO_URI, opts)
+    .then((mongoose) => {
+      console.log('✅ MongoDB connected successfully!');
+      return mongoose;
+    })
+    .catch((error) => {
+      console.error('❌ Database connection failed', error);
+      cachedPromise = null; 
+      throw error;
     });
 
-    isConnected = db.connections[0].readyState === 1;
-    console.log('MongoDB connected successfully!');
-  } catch (error) {
-    console.log('Database connection failed', error);
-    throw new Error('MongoDB Connection Failed');
-  }
+  return cachedPromise;
 }
 
 export default connectDB;
