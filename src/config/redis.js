@@ -1,6 +1,7 @@
 import { createClient } from 'redis';
 
 const redisUrl = process.env.REDIS_URL;
+let isConnecting = false;
 
 export const redisClient = createClient({
   url: redisUrl,
@@ -10,24 +11,32 @@ export const redisClient = createClient({
 });
 
 redisClient.on('error', (err) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.error('❌ Redis Client Error:', err.message);
-  }
+  console.error('❌ Redis Client Error:', err.message);
 });
 
 export const connectRedis = async () => {
-  if (!redisUrl) return null;
+  if (!redisUrl) {
+    console.warn('⚠️ REDIS_URL not found, Redis disabled');
+    return null;
+  }
+
+  if (redisClient.isReady) {
+    return redisClient;
+  }
+
+  if (isConnecting) {
+    return redisClient;
+  }
 
   try {
-    if (redisClient.isOpen || redisClient.isReady) {
-      return redisClient;
-    }
-
+    isConnecting = true;
     await redisClient.connect();
     console.log('✅ Redis Connected');
     return redisClient;
   } catch (error) {
     console.error('❌ Redis Connection Failed:', error.message);
-    return null; 
+    return null;
+  } finally {
+    isConnecting = false;
   }
 };

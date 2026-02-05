@@ -2,42 +2,23 @@ import mongoose from 'mongoose';
 
 const MONGO_URI = process.env.MONGO_URI;
 
-if (!MONGO_URI) {
-  throw new Error('Please define the MONGO_URI environment variable');
-}
-
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-      maxPoolSize: 10,
-    };
-
-    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
-      console.log('✅ MongoDB Connected');
-      return mongoose;
-    });
+const connectDB = async () => {
+  if (!MONGO_URI) {
+    console.error('❌ MONGO_URI is not defined in environment variables');
+    process.exit(1);
   }
 
   try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    console.error('❌ MongoDB Connection Error:', e);
-    throw e;
-  }
+    await mongoose.connect(MONGO_URI, {
+      dbName: 'your_db_name', 
+    });
 
-  return cached.conn;
-}
+    console.log('✅ MongoDB Connected');
+  } catch (error) {
+    console.error('❌ MongoDB Connection Failed');
+    console.error(error.message);
+    process.exit(1);
+  }
+};
 
 export default connectDB;
