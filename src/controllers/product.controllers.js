@@ -117,8 +117,8 @@ export const createProduct = async (req, res) => {
       title,
       description,
       shortDescription,
-      price, 
-      deadline, 
+      price,
+      deadline,
       stock,
       category,
       brand,
@@ -226,17 +226,20 @@ export const getAllProducts = async (req, res) => {
       sort,
       search,
       productType,
+      isAdmin, // ফ্রন্টএন্ড থেকে অ্যাডমিন প্যানেলের জন্য এটি পাঠাবেন
       'price.base[lte]': maxPrice,
     } = req.query;
 
-    let query = { status: 'Published' };
+    let query = isAdmin === 'true' ? {} : { status: 'Published' };
 
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { tags: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } }, 
       ];
     }
+
     if (category) query.category = category;
     if (brand) query.brand = brand;
     if (productType) query.productType = productType;
@@ -292,7 +295,7 @@ export const getProductBySlug = async (req, res) => {
 
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-    product.views += 1; // Popularity track
+    product.views += 1;
     await product.save();
 
     res.json({ success: true, product });
