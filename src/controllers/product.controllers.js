@@ -236,7 +236,7 @@ export const getAllProducts = async (req, res) => {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { tags: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } }, 
+        { sku: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -355,18 +355,16 @@ export const updateProduct = async (req, res) => {
     const productId = req.params.id;
     let product = await productModel.findById(productId);
 
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
     let updateData = { ...req.body };
 
-    // ১. টাইটেল চেঞ্জ হলে স্লাগ আপডেট
+    // ১. স্লাগ আপডেট
     if (req.body.title) {
       updateData.slug = slugify(req.body.title, { lower: true, strict: true });
     }
 
-    // ২. স্মার্ট ডাটা পার্সিং (সেফটি চেক)
+    // ২. স্মার্ট ডাটা পার্সিং (সেফটি)
     const parseData = (data) => {
       if (!data) return undefined;
       try {
@@ -377,32 +375,20 @@ export const updateProduct = async (req, res) => {
     };
 
     if (req.body.price) updateData.price = parseData(req.body.price);
-    if (req.body.offer) updateData.offer = parseData(req.body.offer);
-    if (req.body.specifications) updateData.specifications = parseData(req.body.specifications);
 
-    // ৩. ইমেজ আপডেট লজিক (Client-side থেকে images আসলে)
-    // images: [ {url, fileId, isPrimary}, ... ]
-    if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
-      // পুরনো ইমেজগুলো ImageKit থেকে ডিলিট করা (যদি নতুন ইমেজ সেট করা হয়)
-      if (product.images && product.images.length > 0) {
-        const deletePromises = product.images.map((img) => deleteFile(img.fileId));
-        await Promise.all(deletePromises);
-      }
-
-      // নতুন ইমেজ সেট করা (যা ফ্রন্টেন্ড থেকে এসেছে)
-      updateData.images = req.body.images;
+    // ৩. অফার ডেডলাইন হ্যান্ডলিং
+    if (req.body.deadline !== undefined) {
+      updateData.offer = {
+        ...product.offer?.toObject(),
+        deadline: req.body.deadline || null,
+      };
     }
 
-    // ৪. ডিসকাউন্টেড প্রাইস রি-ক্যালকুলেশন (যদি প্রাইস বা অফার আপডেট হয়)
-    if (updateData.price || updateData.offer) {
-      const basePrice = updateData.price?.base || product.price.base;
-      const offerPercent = updateData.offer?.percentage || product.offer?.percentage || 0;
-
-      updateData.price = {
-        ...updateData.price,
-        base: basePrice,
-        discounted: Math.round(basePrice - (basePrice * offerPercent) / 100),
-      };
+    // ৪. ডিসকাউন্ট রি-ক্যালকুলেশন (Pre-save schema লজিকের সাথে সামঞ্জস্য রেখে)
+    // এখানে আমরা শুধু ডাটা পাস করবো, স্কিমা অটো পার্সেন্টেজ বের করে নিবে
+    if (updateData.price) {
+      updateData.price.base = Number(updateData.price.base);
+      updateData.price.discounted = Number(updateData.price.discounted);
     }
 
     const updatedProduct = await productModel.findByIdAndUpdate(
@@ -411,11 +397,7 @@ export const updateProduct = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    res.json({
-      success: true,
-      message: 'Product updated successfully!',
-      product: updatedProduct,
-    });
+    res.json({ success: true, message: 'Product updated successfully!', product: updatedProduct });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
