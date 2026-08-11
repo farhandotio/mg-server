@@ -7,8 +7,8 @@ const validate = (req, res, next) => {
 };
 
 export const createReviewValidation = [
-  body('productId').isMongoId().withMessage('Invalid Product ID'),
-  body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
-  body('comment').isLength({ min: 10 }).withMessage('Comment must be at least 10 characters long'),
+  body('productId').isMongoId().withMessage('অবৈধ প্রোডাক্ট আইডি'),
+  body('rating').isInt({ min: 1, max: 5 }).withMessage('রেটিং ১ থেকে ৫ এর মধ্যে হতে হবে'),
+  body('comment').isLength({ min: 10 }).withMessage('মন্তব্য কমপক্ষে ১০ অক্ষরের হতে হবে'),
   validate,
 ];

@@ -25,7 +25,7 @@ export const csrfProtection = (req, res, next) => {
     console.error(`🔴 CSRF Blocked: From ${requestOrigin}, Expected ${allowedOrigin}`);
     return res.status(403).json({
       success: false,
-      message: 'Forbidden: CSRF validation failed.',
+      message: 'নিরোধিত: CSRF যাচাইকরণ ব্যর্থ হয়েছে।',
     });
   }
 

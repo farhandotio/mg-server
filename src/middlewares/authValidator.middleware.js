@@ -20,23 +20,23 @@ const registerUserValidations = [
   body('fullname')
     .trim()
     .notEmpty()
-    .withMessage('Full name is required.')
+    .withMessage('পূর্ণ নাম আবশ্যক।')
     .isLength({ min: 3 })
-    .withMessage('Full name must be at least 3 characters long.'),
+    .withMessage('পূর্ণ নাম কমপক্ষে ৩ অক্ষরের হতে হবে।'),
 
   body('email')
     .trim()
     .notEmpty()
-    .withMessage('Email is required.')
+    .withMessage('ইমেল আবশ্যক।')
     .isEmail()
-    .withMessage('Please enter a valid email address.')
+    .withMessage('একটি বৈধ ইমেল ঠিকানা দিন।')
     .normalizeEmail(),
 
   body('password')
     .notEmpty()
-    .withMessage('Password is required.')
+    .withMessage('পাসওয়ার্ড আবশ্যক।')
     .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long.'),
+    .withMessage('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।'),
 
   responseWithValidationErrors,
 ];
@@ -46,11 +46,11 @@ const loginUserValidations = [
   body('email')
     .trim()
     .notEmpty()
-    .withMessage('Email is required.')
+    .withMessage('ইমেল আবশ্যক।')
     .isEmail()
-    .withMessage('Please enter a valid email address.'),
+    .withMessage('একটি বৈধ ইমেল ঠিকানা দিন।'),
 
-  body('password').notEmpty().withMessage('Password is required.'),
+  body('password').notEmpty().withMessage('পাসওয়ার্ড আবশ্যক।'),
 
   responseWithValidationErrors,
 ];
@@ -60,9 +60,9 @@ const forgotPasswordValidation = [
   body('email')
     .trim()
     .notEmpty()
-    .withMessage('Email is required.')
+    .withMessage('ইমেল আবশ্যক।')
     .isEmail()
-    .withMessage('Please enter a valid email address.'),
+    .withMessage('একটি বৈধ ইমেল ঠিকানা দিন।'),
 
   responseWithValidationErrors,
 ];
@@ -71,9 +71,9 @@ const forgotPasswordValidation = [
 const resetPasswordValidation = [
   body('password')
     .notEmpty()
-    .withMessage('New password is required.')
+    .withMessage('নতুন পাসওয়ার্ড আবশ্যক।')
     .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long.'),
+    .withMessage('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।'),
 
   responseWithValidationErrors,
 ];
@@ -83,17 +83,20 @@ const addAddressValidation = [
   body('phone')
     .trim()
     .notEmpty()
-    .withMessage('Phone number is required.')
+    .withMessage('ফোন নম্বর আবশ্যক।')
     .isLength({ min: 11, max: 15 })
-    .withMessage('Enter a valid phone number.'),
+    .withMessage('একটি বৈধ ফোন নম্বর দিন।'),
 
-  body('street').trim().notEmpty().withMessage('Street address is required.'),
-  body('city').trim().notEmpty().withMessage('City is required.'),
-  body('state').trim().notEmpty().withMessage('State is required.'),
-  body('zip').trim().notEmpty().withMessage('ZIP code is required.'),
-  body('country').trim().notEmpty().withMessage('Country is required.'),
+  body('street').trim().notEmpty().withMessage('স্ট্রিট ঠিকানা আবশ্যক।'),
+  body('city').trim().notEmpty().withMessage('শহর আবশ্যক।'),
+  body('state').trim().notEmpty().withMessage('বিভাগ/রাজ্য আবশ্যক।'),
+  body('zip').trim().notEmpty().withMessage('পোস্ট কোড আবশ্যক।'),
+  body('country').trim().notEmpty().withMessage('দেশ আবশ্যক।'),
 
-  body('isDefault').optional().isBoolean().withMessage('isDefault must be a boolean (true/false)'),
+  body('isDefault')
+    .optional()
+    .isBoolean()
+    .withMessage('isDefault অবশ্যই একটি বুলিয়ান মান হতে হবে।'),
 
   responseWithValidationErrors,
 ];

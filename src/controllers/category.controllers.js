@@ -8,7 +8,7 @@ export const createCategory = async (req, res) => {
 
     // ইমেজ চেক (অবজেক্ট এবং ইউআরএল নিশ্চিত করা)
     if (!image || !image.url) {
-      return res.status(400).json({ message: 'Category image URL is required' });
+      return res.status(400).json({ message: 'ক্যাটেগরি ইমেজ URL আবশ্যক' });
     }
 
     const slug = name.toLowerCase().split(' ').join('-');
@@ -20,11 +20,11 @@ export const createCategory = async (req, res) => {
       status: status || 'ACTIVE',
     });
 
-    res.status(201).json({ success: true, message: 'Category created!', category });
+    res.status(201).json({ success: true, message: 'ক্যাটেগরি তৈরি হয়েছে!', category });
   } catch (err) {
     if (err.code === 11000)
-      return res.status(400).json({ message: 'Category name already exists' });
-    res.status(500).json({ message: err.message || 'Server error' });
+      return res.status(400).json({ message: 'ক্যাটেগরি নাম ইতিমধ্যে আছে' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -44,7 +44,7 @@ export const updateCategory = async (req, res) => {
     if (image && image.url) {
       const category = await categoryModel.findById(req.params.id);
 
-      if (!category) return res.status(404).json({ message: 'Category not found' });
+      if (!category) return res.status(404).json({ message: 'ক্যাটেগরি পাওয়া যায়নি' });
 
       // যদি নতুন ইমেজ ইউআরএল পুরনো ইউআরএল থেকে আলাদা হয়
       if (image.url !== category.image?.url) {
@@ -67,9 +67,9 @@ export const updateCategory = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    res.json({ success: true, message: 'Category updated!', category: updatedCategory });
+    res.json({ success: true, message: 'ক্যাটেগরি আপডেট হয়েছে!', category: updatedCategory });
   } catch (err) {
-    res.status(500).json({ message: err.message || 'Server error' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -77,7 +77,7 @@ export const updateCategory = async (req, res) => {
 export const deleteCategory = async (req, res) => {
   try {
     const category = await categoryModel.findById(req.params.id);
-    if (!category) return res.status(404).json({ message: 'Category not found' });
+    if (!category) return res.status(404).json({ message: 'ক্যাটেগরি পাওয়া যায়নি' });
 
     // ইমেজকিট থেকে ফাইল রিমুভ করা
     if (category.image && category.image.fileId) {
@@ -90,9 +90,9 @@ export const deleteCategory = async (req, res) => {
 
     await categoryModel.findByIdAndDelete(req.params.id);
 
-    res.json({ success: true, message: 'Category removed from terminal' });
+    res.json({ success: true, message: 'ক্যাটেগরি সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (err) {
-    res.status(500).json({ message: err.message || 'Server error' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -102,6 +102,6 @@ export const getAllCategories = async (req, res) => {
     const categories = await categoryModel.find().sort({ createdAt: -1 });
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: 'অভ্যন্তরীণ সার্ভার ত্রুটি' });
   }
 };

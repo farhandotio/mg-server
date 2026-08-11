@@ -7,18 +7,18 @@ const requireAuth = async (req, res, next) => {
     const token = req.cookies?.accessToken;
 
     if (!token) {
-      return res.status(401).json({ message: 'Authentication required. Please login.' });
+      return res.status(401).json({ message: 'প্রমাণীকরণ প্রয়োজন। অনুগ্রহ করে লগইন করুন।' });
     }
 
     jwt.verify(token, process.env.JWT_ACCESS_KEY, async (err, decoded) => {
       if (err) {
-        return res.status(403).json({ message: 'Access token expired or invalid.' });
+        return res.status(403).json({ message: 'অ্যাক্সেস টোকেন মেয়াদোত্তীর্ণ বা অবৈধ।' });
       }
 
       const user = await userModel.findById(decoded.id).select('-password');
 
       if (!user) {
-        return res.status(401).json({ message: 'User no longer exists.' });
+        return res.status(401).json({ message: 'ব্যবহারকারী আর বিদ্যমান নেই।' });
       }
 
       req.user = user;
@@ -26,7 +26,7 @@ const requireAuth = async (req, res, next) => {
     });
   } catch (err) {
     console.error('Auth Middleware Error:', err.message);
-    return res.status(500).json({ message: 'Internal server error during authentication.' });
+    return res.status(500).json({ message: 'প্রমাণীকরণের সময় অভ্যন্তরীণ সার্ভার ত্রুটি।' });
   }
 };
 
@@ -58,11 +58,11 @@ const optionalAuth = async (req, res, next) => {
 // -------------------- ADMIN ONLY -------------------- //
 const isAdmin = (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Unauthorized. Please login first.' });
+    return res.status(401).json({ message: 'অনুমোদিত নয়। আগে লগইন করুন।' });
   }
 
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Access denied. Admins only.' });
+    return res.status(403).json({ message: 'অ্যাক্সেস প্রত্যাখ্যাত। শুধুমাত্র অ্যাডমিনদের জন্য।' });
   }
 
   next();

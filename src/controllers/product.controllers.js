@@ -28,7 +28,7 @@ import slugify from 'slugify';
 //     if (!Array.isArray(images) || images.length === 0) {
 //       return res.status(400).json({
 //         success: false,
-//         message: 'At least one product image is required',
+//         message: 'অন্তত একটি প্রোডাক্ট ইমেজ আবশ্যক',
 //       });
 //     }
 
@@ -52,7 +52,7 @@ import slugify from 'slugify';
 //     if (!finalPrice?.base || Number(finalPrice.base) <= 0) {
 //       return res.status(400).json({
 //         success: false,
-//         message: 'Base price is required and must be greater than 0',
+//         message: 'মূল দাম প্রয়োজন এবং সেটি ০-র বেশি হতে হবে',
 //       });
 //     }
 
@@ -92,7 +92,7 @@ import slugify from 'slugify';
 
 //     return res.status(201).json({
 //       success: true,
-//       message: 'Product created successfully!',
+//       message: 'প্রোডাক্ট সফলভাবে তৈরি হয়েছে!',
 //       product,
 //     });
 //   } catch (err) {
@@ -136,7 +136,7 @@ export const createProduct = async (req, res) => {
     if (!Array.isArray(images) || images.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'At least one product image is required',
+        message: 'অন্তত একটি প্রোডাক্ট ইমেজ আবশ্যক',
       });
     }
 
@@ -159,7 +159,7 @@ export const createProduct = async (req, res) => {
     if (!finalPrice?.base || Number(finalPrice.base) <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Base price is required and must be greater than 0',
+        message: 'মূল দাম প্রয়োজন এবং সেটি ০-র বেশি হতে হবে',
       });
     }
 
@@ -196,7 +196,7 @@ export const createProduct = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Product created successfully!',
+      message: 'প্রোডাক্ট সফলভাবে তৈরি হয়েছে!',
       product,
     });
   } catch (err) {
@@ -281,7 +281,7 @@ export const getAllProducts = async (req, res) => {
     });
   } catch (err) {
     console.error('Fetch Error:', err);
-    res.status(500).json({ success: false, message: 'Vault Access Denied!' });
+    res.status(500).json({ success: false, message: 'ভল্ট অ্যাক্সেস প্রত্যাখ্যাত' });
   }
 };
 
@@ -293,14 +293,14 @@ export const getProductBySlug = async (req, res) => {
       .populate('category', 'name')
       .populate('brand', 'name');
 
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'প্রোডাক্ট পাওয়া যায়নি' });
 
     product.views += 1;
     await product.save();
 
     res.json({ success: true, product });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -318,7 +318,7 @@ export const getRelatedProducts = async (req, res) => {
 
     res.json({ success: true, products });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -346,7 +346,7 @@ export const searchProducts = async (req, res) => {
 
     res.json({ success: true, products });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Search failed' });
+    res.status(500).json({ success: false, message: 'অনুসন্ধান ব্যর্থ হয়েছে' });
   }
 };
 
@@ -355,7 +355,7 @@ export const updateProduct = async (req, res) => {
     const productId = req.params.id;
     let product = await productModel.findById(productId);
 
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'প্রোডাক্ট পাওয়া যায়নি' });
 
     let updateData = { ...req.body };
 
@@ -397,7 +397,11 @@ export const updateProduct = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    res.json({ success: true, message: 'Product updated successfully!', product: updatedProduct });
+    res.json({
+      success: true,
+      message: 'প্রোডাক্ট সফলভাবে আপডেট হয়েছে!',
+      product: updatedProduct,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -408,9 +412,9 @@ export const updateProductStatus = async (req, res) => {
   try {
     const { status } = req.body;
     const product = await productModel.findByIdAndUpdate(req.params.id, { status }, { new: true });
-    res.json({ success: true, message: 'Status updated!', product });
+    res.json({ success: true, message: 'অবস্থা আপডেট হয়েছে!', product });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Update failed' });
+    res.status(500).json({ success: false, message: 'আপডেট ব্যর্থ হয়েছে' });
   }
 };
 
@@ -418,13 +422,13 @@ export const updateProductStatus = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const product = await productModel.findById(req.params.id);
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'প্রোডাক্ট পাওয়া যায়নি' });
 
     await Promise.all(product.images.map((img) => deleteFile(img.fileId)));
     await productModel.findByIdAndDelete(req.params.id);
 
-    res.json({ success: true, message: 'Product deleted successfully' });
+    res.json({ success: true, message: 'প্রোডাক্ট সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'সার্ভার ত্রুটি হয়েছে' });
   }
 };

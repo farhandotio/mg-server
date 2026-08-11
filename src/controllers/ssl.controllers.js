@@ -12,10 +12,10 @@ import updateStockAfterPayment from '../utils/updateStock.js';
 
 //     const order = await Order.findById(orderId).populate('user');
 
-//     if (!order) return res.status(404).json({ message: 'Order not found' });
+//     if (!order) return res.status(404).json({ message: 'অর্ডার পাওয়া যায়নি' });
 
 //     if (order.payment.status === 'PAID') {
-//       return res.status(400).json({ message: 'Order already paid' });
+//       return res.status(400).json({ message: 'অর্ডার ইতিমধ্যে পেইড হয়েছে' });
 //     }
 
 //     const tran_id = `TXN_${uuidv4()}`;
@@ -104,7 +104,7 @@ import updateStockAfterPayment from '../utils/updateStock.js';
 //       });
 //     }
 //   } catch (err) {
-//     res.status(500).json({ message: 'SSL init failed', error: err.message });
+//     res.status(500).json({ message: 'এসএসএল শুরু ব্যর্থ হয়েছে', error: err.message });
 //   }
 // };
 
@@ -115,10 +115,10 @@ export const initSSLPayment = async (req, res) => {
 
     const order = await Order.findById(orderId).populate('user');
 
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order) return res.status(404).json({ message: 'অর্ডার পাওয়া যায়নি' });
 
     if (order.payment.status === 'PAID') {
-      return res.status(400).json({ message: 'Order already paid' });
+      return res.status(400).json({ message: 'অর্ডার ইতিমধ্যে পেইড হয়েছে' });
     }
 
     const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`; 
@@ -176,13 +176,13 @@ export const initSSLPayment = async (req, res) => {
       });
     } else {
       res.status(400).json({
-        message: response.data?.failedreason || 'SSL Session creation failed',
+        message: response.data?.failedreason || 'এসএসএল সেশন তৈরি ব্যর্থ হয়েছে',
         data: response.data,
       });
     }
   } catch (err) {
     console.error('SSL Init Error:', err);
-    res.status(500).json({ message: 'Internal Server Error during payment init' });
+    res.status(500).json({ message: 'পেমেন্ট শুরু করার সময় অভ্যন্তরীণ সার্ভার ত্রুটি' });
   }
 };
 
@@ -240,7 +240,7 @@ export const sslIPN = async (req, res) => {
     }
     res.status(200).send('OK');
   } catch (err) {
-    res.status(500).send('Internal Server Error');
+    res.status(500).send('অভ্যন্তরীণ সার্ভার ত্রুটি');
   }
 };
 

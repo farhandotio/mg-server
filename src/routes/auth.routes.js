@@ -6,6 +6,8 @@ import * as middleware from '../middlewares/auth.middleware.js';
 const router = express.Router();
 
 // AUTH
+router.get('/google', controller.googleAuthRedirect);
+router.get('/google/callback', controller.googleCallback);
 router.post('/register', validators.registerUserValidations, controller.register);
 router.get('/verify-email/:token', controller.verifyEmail);
 router.post('/login', validators.loginUserValidations, controller.login);

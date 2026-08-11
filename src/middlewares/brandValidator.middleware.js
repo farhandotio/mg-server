@@ -7,6 +7,6 @@ const validate = (req, res, next) => {
 };
 
 export const brandValidation = [
-  body('name').trim().notEmpty().withMessage('Brand name is required').isLength({ min: 2 }),
+  body('name').trim().notEmpty().withMessage('ব্র্যান্ড নাম আবশ্যক').isLength({ min: 2 }),
   validate,
 ];

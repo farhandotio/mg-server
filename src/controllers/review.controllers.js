@@ -21,12 +21,12 @@ export const addReview = async (req, res) => {
     if (!hasOrdered) {
       return res
         .status(403)
-        .json({ success: false, message: 'Purchase the product to leave a review.' });
+        .json({ success: false, message: 'রিভিউ দিতে আপনাকে প্রোডাক্টটি কিনতে হবে।' });
     }
 
     const alreadyReviewed = await reviewModel.findOne({ productId, userId });
     if (alreadyReviewed) {
-      return res.status(400).json({ success: false, message: 'You already reviewed this product' });
+      return res.status(400).json({ success: false, message: 'আপনি ইতোমধ্যে এই পণ্যের রিভিউ দিয়েছেন' });
     }
 
     const review = await reviewModel.create({
@@ -38,7 +38,7 @@ export const addReview = async (req, res) => {
       status: 'Approved', // প্রোডাকশনে 'Pending' রাখতে পারেন মডারেশনের জন্য
     });
 
-    res.status(201).json({ success: true, message: 'Review submitted!', review });
+    res.status(201).json({ success: true, message: 'রিভিউ জমা হয়েছে!', review });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -54,8 +54,8 @@ export const updateReview = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!review) return res.status(404).json({ message: 'Review not found or unauthorized' });
-    res.json({ success: true, message: 'Review updated!', review });
+    if (!review) return res.status(404).json({ message: 'রিভিউ পাওয়া যায়নি বা অনুমোদিত নয়' });
+    res.json({ success: true, message: 'রিভিউ আপডেট হয়েছে!', review });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -65,7 +65,7 @@ export const updateReview = async (req, res) => {
 export const toggleHelpful = async (req, res) => {
   try {
     const review = await reviewModel.findById(req.params.id);
-    if (!review) return res.status(404).json({ message: 'Review not found' });
+    if (!review) return res.status(404).json({ message: 'রিভিউ পাওয়া যায়নি' });
 
     // লাইক লজিক (একবার ক্লিক করলে বাড়বে, আবার করলে কমবে)
     const isHelpful = review.helpfulVotes.includes(req.user._id);
@@ -159,14 +159,14 @@ export const updateReviewStatus = async (req, res) => {
 export const deleteReview = async (req, res) => {
   try {
     const review = await reviewModel.findById(req.params.id);
-    if (!review) return res.status(404).json({ message: 'Review not found' });
+    if (!review) return res.status(404).json({ message: 'রিভিউ পাওয়া যায়নি' });
 
     if (review.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Unauthorized' });
+      return res.status(403).json({ message: 'অনুমোদিত নয়' });
     }
 
     await reviewModel.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: 'Review deleted successfully' });
+    res.json({ success: true, message: 'রিভিউ সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

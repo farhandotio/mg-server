@@ -15,17 +15,17 @@ const validate = (req, res, next) => {
 export const addToCartValidation = [
   body('productId')
     .notEmpty()
-    .withMessage('Product ID is required')
+    .withMessage('প্রোডাক্ট আইডি আবশ্যক')
     .isMongoId()
-    .withMessage('Invalid Product ID format'),
+    .withMessage('অবৈধ প্রোডাক্ট আইডি ফরম্যাট'),
 
   body('quantity')
     .notEmpty()
-    .withMessage('Quantity is required')
+    .withMessage('পরিমাণ আবশ্যক')
     .isInt({ min: 1 })
-    .withMessage('Quantity must be at least 1'),
+    .withMessage('পরিমাণ কমপক্ষে ১ হতে হবে'),
 
-  body('sessionId').notEmpty().withMessage('Session ID is required for guest users'),
+  body('sessionId').notEmpty().withMessage('গেস্ট ব্যবহারকারীর জন্য সেশন আইডি আবশ্যক'),
 
   validate,
 ];
@@ -33,23 +33,23 @@ export const addToCartValidation = [
 export const removeFromCartValidation = [
   body('productId')
     .notEmpty()
-    .withMessage('Product ID is required')
+    .withMessage('প্রোডাক্ট আইডি আবশ্যক')
     .isMongoId()
-    .withMessage('Invalid Product ID format'),
+    .withMessage('অবৈধ প্রোডাক্ট আইডি ফরম্যাট'),
 
-  body('sessionId').notEmpty().withMessage('Session ID is required'),
+  body('sessionId').notEmpty().withMessage('সেশন আইডি আবশ্যক'),
 
   validate,
 ];
 
 export const getCartValidation = [
-  query('sessionId').notEmpty().withMessage('Session ID is required to fetch cart'),
+  query('sessionId').notEmpty().withMessage('কার্ট আনতে সেশন আইডি আবশ্যক'),
 
   validate,
 ];
 
 export const mergeCartValidation = [
-  body('sessionId').notEmpty().withMessage('Session ID is required to merge guest cart'),
+  body('sessionId').notEmpty().withMessage('গেস্ট কার্ট মার্জ করতে সেশন আইডি আবশ্যক'),
 
   validate,
 ];

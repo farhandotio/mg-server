@@ -19,68 +19,68 @@ export const productValidation = [
   body('title')
     .trim()
     .notEmpty()
-    .withMessage('Product title is required')
+    .withMessage('প্রোডাক্ট শিরোনাম আবশ্যক')
     .isLength({ max: 200 })
-    .withMessage('Title cannot exceed 200 characters'),
+    .withMessage('শিরোনাম ২০০ অক্ষরের বেশি হতে পারবে না'),
 
-  body('description').notEmpty().withMessage('Product description is required'),
+  body('description').notEmpty().withMessage('প্রোডাক্ট বিবরণ আবশ্যক'),
 
   body('shortDescription')
     .optional()
     .isLength({ max: 500 })
-    .withMessage('Short description cannot exceed 500 characters'),
+    .withMessage('স্বল্প বিবরণ সর্বাধিক ৫০০ অক্ষর হতে পারে'),
 
   body('category')
     .notEmpty()
-    .withMessage('Category ID is required')
+    .withMessage('ক্যাটেগরি আইডি আবশ্যক')
     .isMongoId()
-    .withMessage('Invalid Category ID format'),
+    .withMessage('অবৈধ ক্যাটেগরি আইডি ফরম্যাট'),
 
   body('brand')
     .notEmpty()
-    .withMessage('Brand ID is required')
+    .withMessage('ব্র্যান্ড আইডি আবশ্যক')
     .isMongoId()
-    .withMessage('Invalid Brand ID format'),
+    .withMessage('অবৈধ ব্র্যান্ড আইডি ফরম্যাট'),
 
   // Nested Price Validation
   body('price.base')
     .notEmpty()
-    .withMessage('Base price is required')
+    .withMessage('মূল দাম আবশ্যক')
     .isNumeric()
-    .withMessage('Price must be a number')
+    .withMessage('মূল্য একটি সংখ্যা হতে হবে')
     .toFloat()
-    .withMessage('Price cannot be negative'),
+    .withMessage('মূল্য নেতিবাচক হতে পারে না'),
 
   // Offer Validation (Schema তে percentage: min 0, max 100 আছে)
   body('offer.percentage')
     .optional()
     .isNumeric()
-    .withMessage('Offer percentage must be a number')
+    .withMessage('অফার শতকরা একটি সংখ্যা হতে হবে')
     .isInt({ min: 0, max: 100 })
-    .withMessage('Offer percentage must be between 0 and 100'),
+    .withMessage('অফার শতকরা ০ থেকে ১০০ এর মধ্যে হতে হবে'),
 
   body('offer.deadline')
     .optional({ checkFalsy: true })
     .isISO8601()
-    .withMessage('Invalid deadline date format'),
+    .withMessage('অনির্ধারিত ডেডলাইন তারিখ ফরম্যাট'),
 
   body('stock')
     .notEmpty()
-    .withMessage('Stock quantity is required')
+    .withMessage('স্টক পরিমাণ আবশ্যক')
     .isInt({ min: 0 })
-    .withMessage('Stock cannot be negative'),
+    .withMessage('স্টক নেতিবাচক হতে পারে না'),
 
-  body('sku').trim().notEmpty().withMessage('SKU is required').toUpperCase(),
+  body('sku').trim().notEmpty().withMessage('SKU আবশ্যক').toUpperCase(),
 
   body('productType')
     .optional()
     .isIn(['Regular', 'FlashSale', 'HotDeals', 'Featured', 'BestSeller', 'NewArrival'])
-    .withMessage('Invalid product type'),
+    .withMessage('অবৈধ প্রোডাক্ট টাইপ'),
 
   body('status')
     .optional()
     .isIn(['Draft', 'Published', 'OutOfStock', 'Archived'])
-    .withMessage('Invalid status type'),
+    .withMessage('অবৈধ স্ট্যাটাস টাইপ'),
 
   // Specifications Validation (Optional)
   body('specifications').optional(),

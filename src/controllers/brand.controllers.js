@@ -7,7 +7,7 @@ export const createBrand = async (req, res) => {
     const { name, status, image } = req.body;
 
     if (!image || !image.url) {
-      return res.status(400).json({ message: 'Brand logo/image URL is required' });
+      return res.status(400).json({ message: 'ব্র্যান্ড লোগো/ইমেজ URL আবশ্যক' });
     }
 
     const slug = name.toLowerCase().split(' ').join('-');
@@ -19,10 +19,10 @@ export const createBrand = async (req, res) => {
       status: status || 'ACTIVE',
     });
 
-    res.status(201).json({ success: true, message: 'Brand identity established!', brand });
+    res.status(201).json({ success: true, message: 'ব্র্যান্ড সফলভাবে তৈরি হয়েছে!', brand });
   } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ message: 'Brand already exists' });
-    res.status(500).json({ message: err.message || 'Server error' });
+    if (err.code === 11000) return res.status(400).json({ message: 'ব্র্যান্ড ইতিমধ্যেই আছে' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -41,7 +41,7 @@ export const updateBrand = async (req, res) => {
     // ইমেজ আপডেট লজিক (URL ভিত্তিক আপডেট সাপোর্ট করে)
     if (image && image.url) {
       const brand = await brandModel.findById(req.params.id);
-      if (!brand) return res.status(404).json({ message: 'Brand not found' });
+      if (!brand) return res.status(404).json({ message: 'ব্র্যান্ড পাওয়া যায়নি' });
 
       // যদি নতুন ইউআরএল পুরনো ইউআরএল থেকে আলাদা হয়
       if (image.url !== brand.image?.url) {
@@ -63,9 +63,9 @@ export const updateBrand = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    res.json({ success: true, message: 'Brand updated successfully!', brand: updatedBrand });
+    res.json({ success: true, message: 'ব্র্যান্ড সফলভাবে আপডেট হয়েছে!', brand: updatedBrand });
   } catch (err) {
-    res.status(500).json({ message: err.message || 'Server error' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -73,7 +73,7 @@ export const updateBrand = async (req, res) => {
 export const deleteBrand = async (req, res) => {
   try {
     const brand = await brandModel.findById(req.params.id);
-    if (!brand) return res.status(404).json({ message: 'Brand not found' });
+    if (!brand) return res.status(404).json({ message: 'ব্র্যান্ড পাওয়া যায়নি' });
 
     // ইমেজকিট থেকে ফাইল ক্লিনআপ
     if (brand.image?.fileId) {
@@ -86,9 +86,9 @@ export const deleteBrand = async (req, res) => {
 
     await brandModel.findByIdAndDelete(req.params.id);
 
-    res.json({ success: true, message: 'Brand purged from terminal' });
+    res.json({ success: true, message: 'ব্র্যান্ড সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (err) {
-    res.status(500).json({ message: err.message || 'Server error' });
+    res.status(500).json({ message: err.message || 'সার্ভার ত্রুটি হয়েছে' });
   }
 };
 
@@ -98,6 +98,6 @@ export const getAllBrands = async (req, res) => {
     const brands = await brandModel.find().sort({ createdAt: -1 });
     res.json({ success: true, brands });
   } catch (err) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: 'অভ্যন্তরীণ সার্ভার ত্রুটি' });
   }
 };

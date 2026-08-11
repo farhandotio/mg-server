@@ -31,7 +31,7 @@ app.use(
 );
 
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'Active', message: 'Server is breathing...' });
+  res.status(200).json({ status: 'Active', message: 'সার্ভার সচল আছে...' });
 });
 
 app.use(csrfProtection);
@@ -49,7 +49,7 @@ app.use((err, req, res, next) => {
   console.error('SERVER_ERROR:', err.stack);
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    message: err.message || 'অভ্যন্তরীণ সার্ভার ত্রুটি',
   });
 });
 

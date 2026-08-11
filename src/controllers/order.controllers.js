@@ -11,14 +11,14 @@
 
 //     // ১. পেমেন্ট মেথড ভ্যালিডেশন (Validation middleware থাকলেও এখানে সেফটি চেক রাখা ভালো)
 //     if (!payment?.method || !['COD', 'ONLINE'].includes(payment.method)) {
-//       return res.status(400).json({ success: false, message: 'Invalid payment method' });
+//       return res.status(400).json({ success: false, message: 'অচল পেমেন্ট পদ্ধতি' });
 //     }
 
 //     // ২. কার্ট খুঁজে বের করা
 //     const cart = await cartModel.findOne({ user: userId }).populate('items.product');
 
 //     if (!cart && (!frontendItems || frontendItems.length === 0)) {
-//       return res.status(400).json({ success: false, message: 'Cart is empty' });
+//       return res.status(400).json({ success: false, message: 'কার্ট খালি' });
 //     }
 
 //     // ৩. প্রাইসিং ক্যালকুলেশন (shippingAddress.city এখন মডেলে আছে)
@@ -82,7 +82,7 @@
 //     });
 //   } catch (err) {
 //     console.error('🔥 Order Create Error:', err);
-//     res.status(500).json({ success: false, message: 'Failed to create order. Please try again.' });
+//     res.status(500).json({ success: false, message: 'অর্ডার তৈরি ব্যর্থ হয়েছে। পরে আবার চেষ্টা করুন।' });
 //   }
 // };
 
@@ -92,11 +92,11 @@
 //     const userId = req.user._id;
 
 //     if (!payment?.method || !['COD', 'ONLINE'].includes(payment.method)) {
-//       return res.status(400).json({ success: false, message: 'Invalid payment method' });
+//       return res.status(400).json({ success: false, message: 'অচল পেমেন্ট পদ্ধতি' });
 //     }
 
 //     if (!orderItem || !orderItem.product) {
-//       return res.status(400).json({ success: false, message: 'No product information provided' });
+//       return res.status(400).json({ success: false, message: 'পণ্যের তথ্য প্রদান করা হয়নি' });
 //     }
 
 //     // ৩. প্রাইসিং ক্যালকুলেশন
@@ -147,14 +147,13 @@
 //     });
 //   } catch (err) {
 //     console.error('🔥 Single Order Create Error:', err);
-//     res.status(500).json({ success: false, message: 'Failed to process Buy Now order.' });
+//     res.status(500).json({ success: false, message: 'এখনই কেনার অর্ডার প্রক্রিয়াকরণ ব্যর্থ হয়েছে' });
 //   }
 // };
 
-
 import orderModel from '../models/order.model.js';
 import cartModel from '../models/cart.model.js';
-import sendEmail from '../utils/email.js'; 
+import sendEmail from '../utils/email.js';
 
 const sendOrderEmails = async (order, userEmail, userName) => {
   try {
@@ -167,7 +166,7 @@ const sendOrderEmails = async (order, userEmail, userName) => {
     });
 
     await sendEmail({
-      email: "support@gadgetbds.com",
+      email: 'support@gadgetbds.com',
       subject: `New Order Received - BDT ${order.pricing.totalPrice}`,
       message: `A new order has been placed by ${userName}. Payment Method: ${order.payment.method}. Total: BDT ${order.pricing.totalPrice}`,
       buttonText: 'Manage Order',
@@ -184,16 +183,16 @@ export const createOrder = async (req, res) => {
   try {
     const { shippingAddress, payment, orderItems: frontendItems } = req.body;
     const userId = req.user._id;
-    const userEmail = req.user.email; 
+    const userEmail = req.user.email;
     const userName = req.user.fullname;
 
     if (!payment?.method || !['COD', 'ONLINE'].includes(payment.method)) {
-      return res.status(400).json({ success: false, message: 'Invalid payment method' });
+      return res.status(400).json({ success: false, message: 'অচল পেমেন্ট পদ্ধতি' });
     }
 
     const cart = await cartModel.findOne({ user: userId }).populate('items.product');
     if (!cart && (!frontendItems || frontendItems.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Cart is empty' });
+      return res.status(400).json({ success: false, message: 'কার্ট খালি' });
     }
 
     const shippingPrice = shippingAddress.city.toLowerCase() === 'dhaka' ? 80 : 150;
@@ -243,7 +242,7 @@ export const createOrder = async (req, res) => {
     });
   } catch (err) {
     console.error('🔥 Order Create Error:', err);
-    res.status(500).json({ success: false, message: 'Failed to create order.' });
+    res.status(500).json({ success: false, message: 'অর্ডার তৈরি ব্যর্থ হয়েছে' });
   }
 };
 
@@ -290,7 +289,9 @@ export const createSingleOrder = async (req, res) => {
     });
   } catch (err) {
     console.error('🔥 Single Order Create Error:', err);
-    res.status(500).json({ success: false, message: 'Failed to process Buy Now order.' });
+    res
+      .status(500)
+      .json({ success: false, message: 'এখনই কেনার অর্ডার প্রক্রিয়াকরণ ব্যর্থ হয়েছে' });
   }
 };
 
@@ -299,7 +300,7 @@ export const myOrders = async (req, res) => {
     const orders = await orderModel.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch orders' });
+    res.status(500).json({ success: false, message: 'অর্ডার লোড করতে ব্যর্থ হয়েছে' });
   }
 };
 
@@ -307,16 +308,16 @@ export const myOrders = async (req, res) => {
 export const getOrderDetails = async (req, res) => {
   try {
     const order = await orderModel.findById(req.params.id).populate('user', 'name email');
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: 'অর্ডার পাওয়া যায়নি' });
 
     // সিকিউরিটি চেক: অর্ডারটি ইউজারের নিজের কি না
     if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Unauthorized access' });
+      return res.status(403).json({ success: false, message: 'অনুমোদিত নয়' });
     }
 
     res.json({ success: true, order });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Error fetching order details' });
+    res.status(500).json({ success: false, message: 'অর্ডার তথ্য আনতে ব্যর্থ হয়েছে' });
   }
 };
 
@@ -324,19 +325,19 @@ export const getOrderDetails = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const order = await orderModel.findById(req.params.id);
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: 'অর্ডার পাওয়া যায়নি' });
 
     // ক্যানসেল করার শর্ত
     if (order.orderStatus !== 'PENDING' || order.payment.status === 'PAID') {
       return res
         .status(400)
-        .json({ success: false, message: 'Order cannot be cancelled at this stage' });
+        .json({ success: false, message: 'এই পর্যায়ে অর্ডার বাতিল করা যাবে না' });
     }
 
     order.orderStatus = 'CANCELLED';
     await order.save();
 
-    res.json({ success: true, message: 'Order cancelled successfully' });
+    res.json({ success: true, message: 'অর্ডার সফলভাবে বাতিল হয়েছে' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -353,7 +354,7 @@ export const getAllOrdersAdmin = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch all orders' });
+    res.status(500).json({ success: false, message: 'সমস্ত অর্ডার আনতে ব্যার্থ হয়েছে' });
   }
 };
 
@@ -363,9 +364,9 @@ export const updateOrderStatus = async (req, res) => {
     const { status } = req.body;
     const order = await orderModel.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: 'অর্ডার পাওয়া যায়নি' });
     if (order.orderStatus === 'DELIVERED')
-      return res.status(400).json({ message: 'Order already delivered' });
+      return res.status(400).json({ message: 'অর্ডার ইতিমধ্যে ডেলিভার হয়েছে' });
 
     // ডেলিভারি হলে স্টক এবং পেমেন্ট আপডেট
     if (status === 'DELIVERED') {
@@ -379,7 +380,7 @@ export const updateOrderStatus = async (req, res) => {
 
     order.orderStatus = status;
     await order.save();
-    res.json({ success: true, message: `Status updated to ${status}` });
+    res.json({ success: true, message: `অবস্থা ${status} এ আপডেট করা হয়েছে` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -391,7 +392,7 @@ export const updatePaymentStatus = async (req, res) => {
     const { status } = req.body;
     const order = await orderModel.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: 'অর্ডার পাওয়া যায়নি' });
 
     if (status === 'PAID' && order.payment.status !== 'PAID') {
       if (order.payment.method === 'COD') {
@@ -403,7 +404,7 @@ export const updatePaymentStatus = async (req, res) => {
     order.payment.status = status;
     await order.save();
 
-    res.json({ success: true, message: 'Payment status updated' });
+    res.json({ success: true, message: 'পেমেন্ট স্ট্যাটাস আপডেট হয়েছে' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

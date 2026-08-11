@@ -13,7 +13,7 @@ export const addToCart = async (req, res) => {
 
     // প্রোডাক্ট চেক
     const product = await productModel.findById(productId);
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'প্রোডাক্ট পাওয়া যায়নি' });
 
     // কার্ট খোঁজা
     let cart = await cartModel.findOne({
@@ -35,7 +35,7 @@ export const addToCart = async (req, res) => {
           ],
         });
       } else {
-        return res.status(400).json({ success: false, message: 'Invalid quantity for new cart' });
+        return res.status(400).json({ success: false, message: 'নতুন কার্টের জন্য অযোগ্য পরিমাণ' });
       }
     } else {
       // কার্ট থাকলে আইটেম চেক
@@ -52,7 +52,7 @@ export const addToCart = async (req, res) => {
           if (newQty > product.stock) {
             return res
               .status(400)
-              .json({ success: false, message: `Only ${product.stock} units available` });
+              .json({ success: false, message: `মাত্র ${product.stock} ইউনিট উপলব্ধ` });
           }
           cart.items[itemIndex].quantity = newQty;
         }
@@ -91,17 +91,17 @@ export const updateCartQuantity = async (req, res) => {
       $or: [{ user: userId, user: { $ne: null } }, { sessionId: sessionId }],
     });
 
-    if (!cart) return res.status(404).json({ success: false, message: 'Cart not found' });
+    if (!cart) return res.status(404).json({ success: false, message: 'কার্ট পাওয়া যায়নি' });
 
     const itemIndex = cart.items.findIndex((item) => item.product.toString() === productId);
     if (itemIndex === -1)
-      return res.status(404).json({ success: false, message: 'Item not in cart' });
+      return res.status(404).json({ success: false, message: 'আইটেম কার্টে নেই' });
 
     const product = await productModel.findById(productId);
 
     if (action === 'increase') {
       if (cart.items[itemIndex].quantity + 1 > product.stock) {
-        return res.status(400).json({ success: false, message: 'Stock limit reached' });
+        return res.status(400).json({ success: false, message: 'স্টক সীমা ছাড়িয়ে গেছে' });
       }
       cart.items[itemIndex].quantity += 1;
     } else if (action === 'decrease') {
@@ -137,7 +137,7 @@ export const getCart = async (req, res) => {
 
     res.status(200).json({ success: true, cart: cart || { items: [] } });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Fetch failed' });
+    res.status(500).json({ success: false, message: 'তথ্য আনা ব্যর্থ হয়েছে' });
   }
 };
 
@@ -157,7 +157,7 @@ export const removeFromCart = async (req, res) => {
     }
     res.json({ success: true, cart });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Remove failed' });
+    res.status(500).json({ success: false, message: 'সরানো ব্যর্থ হয়েছে' });
   }
 };
 
@@ -189,6 +189,6 @@ export const mergeCart = async (req, res) => {
 
     res.json({ success: true, cart: finalCart });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Merge failed' });
+    res.status(500).json({ success: false, message: 'মার্জ ব্যর্থ হয়েছে' });
   }
 };

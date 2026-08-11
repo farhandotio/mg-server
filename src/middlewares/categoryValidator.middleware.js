@@ -7,8 +7,8 @@ const validate = (req, res, next) => {
 };
 
 export const categoryValidation = [
-  body('name').trim().notEmpty().withMessage('Category name is required'),
-  body('image.url').notEmpty().withMessage('Image URL is required'),
-  body('image.fileId').notEmpty().withMessage('Image fileId is required'),
+  body('name').trim().notEmpty().withMessage('ক্যাটেগরি নাম আবশ্যক'),
+  body('image.url').notEmpty().withMessage('ইমেজ URL আবশ্যক'),
+  body('image.fileId').notEmpty().withMessage('ইমেজ fileId আবশ্যক'),
   validate,
 ];
