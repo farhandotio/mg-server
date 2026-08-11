@@ -86,7 +86,7 @@ export const register = async (req, res) => {
     try {
       await sendEmail({
         email: user.email,
-        subject: 'Verify your account - Gadget BDS',
+        subject: 'Verify your account - My Gadget',
         message: `হাই ${fullname}, নিবন্ধন সম্পন্ন করতে অনুগ্রহ করে আপনার একাউন্ট যাচাই করুন।`,
         buttonText: 'Verify Account',
         buttonUrl: verificationUrl,

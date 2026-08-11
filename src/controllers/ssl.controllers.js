@@ -121,7 +121,7 @@ export const initSSLPayment = async (req, res) => {
       return res.status(400).json({ message: 'অর্ডার ইতিমধ্যে পেইড হয়েছে' });
     }
 
-    const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`; 
+    const tran_id = `TXN_${uuidv4().split('-')[0].toUpperCase()}`;
 
     const payload = {
       store_id: process.env.SSLCOMMERZ_STORE_ID,
@@ -134,17 +134,15 @@ export const initSSLPayment = async (req, res) => {
       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
 
-      
-      cus_name: order.user?.fullname || 'Customer', 
+      cus_name: order.user?.fullname || 'Customer',
       cus_email: order.user?.email || 'customer@email.com',
-      cus_phone: order.shippingAddress.phone || '01XXXXXXXXX', 
-      cus_add1: order.shippingAddress.street || 'N/A', 
+      cus_phone: order.shippingAddress.phone || '01XXXXXXXXX',
+      cus_add1: order.shippingAddress.street || 'N/A',
       cus_city: order.shippingAddress.city || 'Dhaka',
       cus_state: order.shippingAddress.state || 'Dhaka',
       cus_postcode: order.shippingAddress.zip || '1000',
       cus_country: order.shippingAddress.country || 'Bangladesh',
 
-      
       ship_name: order.user?.fullname || 'Customer',
       ship_add1: order.shippingAddress.street,
       ship_city: order.shippingAddress.city,
@@ -153,7 +151,7 @@ export const initSSLPayment = async (req, res) => {
       ship_country: order.shippingAddress.country || 'Bangladesh',
 
       shipping_method: 'Courier',
-      product_name: 'Gadget BDS Order',
+      product_name: 'My Gadget Order',
       product_category: 'Electronics',
       product_profile: 'general',
     };
@@ -164,7 +162,6 @@ export const initSSLPayment = async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    
     if (response.data?.status === 'SUCCESS' && response.data?.GatewayPageURL) {
       order.payment.transactionId = tran_id;
       order.payment.provider = 'SSLCOMMERZ';
