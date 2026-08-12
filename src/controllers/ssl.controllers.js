@@ -6,109 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import updateStockAfterPayment from '../utils/updateStock.js';
 
 // ১. পেমেন্ট ইনিশিয়েট করা
-// export const initSSLPayment = async (req, res) => {
-//   try {
-//     const { orderId } = req.body;
-
-//     const order = await Order.findById(orderId).populate('user');
-
-//     if (!order) return res.status(404).json({ message: 'অর্ডার পাওয়া যায়নি' });
-
-//     if (order.payment.status === 'PAID') {
-//       return res.status(400).json({ message: 'অর্ডার ইতিমধ্যে পেইড হয়েছে' });
-//     }
-
-//     const tran_id = `TXN_${uuidv4()}`;
-
-//     const payload = {
-//       store_id: process.env.SSLCOMMERZ_STORE_ID,
-
-//       store_passwd: process.env.SSLCOMMERZ_STORE_PASSWORD,
-
-//       total_amount: parseFloat(order.pricing.totalPrice).toFixed(2),
-
-//       currency: 'BDT',
-
-//       tran_id,
-
-//       success_url: process.env.SSLCOMMERZ_SUCCESS_URL,
-
-//       fail_url: process.env.SSLCOMMERZ_FAIL_URL,
-
-//       cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
-
-//       ipn_url: process.env.SSLCOMMERZ_IPN_URL,
-
-//       // কাস্টমার ইনফো
-
-//       cus_name: order.shippingAddress.fullname,
-
-//       cus_email: order.user.email || 'customer@email.com',
-
-//       cus_phone: order.shippingAddress.phoneNumber,
-
-//       cus_add1: order.shippingAddress.address,
-
-//       cus_city: order.shippingAddress.city,
-
-//       cus_country: 'Bangladesh',
-
-//       ship_name: order.shippingAddress.fullname,
-
-//       ship_add1: order.shippingAddress.address,
-
-//       ship_city: order.shippingAddress.city,
-
-//       ship_state: order.shippingAddress.city,
-
-//       ship_postcode: '1000',
-
-//       ship_country: 'Bangladesh',
-
-//       shipping_method: 'Courier',
-
-//       product_name: 'Ecommerce Order',
-
-//       product_category: 'General',
-
-//       product_profile: 'general',
-//     };
-
-//     const response = await axios.post(
-//       `${process.env.SSLCOMMERZ_BASE_URL}/gwprocess/v4/api.php`,
-
-//       qs.stringify(payload),
-
-//       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-//     );
-
-//     if (response.data?.status === 'SUCCESS') {
-//       order.payment.transactionId = tran_id;
-
-//       order.payment.provider = 'SSLCOMMERZ';
-
-//       await order.save();
-
-//       res.json({
-//         success: true,
-
-//         gatewayUrl: response.data.GatewayPageURL,
-//       });
-//     } else {
-//       console.log('SSL Failed Reason:', response.data.failedreason);
-
-//       res.status(400).json({
-//         message: response.data.failedreason || 'SSL Session failed',
-
-//         data: response.data,
-//       });
-//     }
-//   } catch (err) {
-//     res.status(500).json({ message: 'এসএসএল শুরু ব্যর্থ হয়েছে', error: err.message });
-//   }
-// };
-
-// ১. পেমেন্ট ইনিশিয়েট করা
 export const initSSLPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -129,10 +26,10 @@ export const initSSLPayment = async (req, res) => {
       total_amount: parseFloat(order.pricing.totalPrice).toFixed(2),
       currency: 'BDT',
       tran_id,
-      success_url: process.env.SSLCOMMERZ_SUCCESS_URL,
-      fail_url: process.env.SSLCOMMERZ_FAIL_URL,
-      cancel_url: process.env.SSLCOMMERZ_CANCEL_URL,
-      ipn_url: process.env.SSLCOMMERZ_IPN_URL,
+      success_url: `${process.env.BACKEND_URL}/api/payment/ssl/success`,
+      fail_url: `${process.env.BACKEND_URL}/api/payment/ssl/fail`,
+      cancel_url: `${process.env.BACKEND_URL}/api/payment/ssl/cancel`,
+      ipn_url: `${process.env.BACKEND_URL}/api/payment/ssl/ipn`,
 
       cus_name: order.user?.fullname || 'Customer',
       cus_email: order.user?.email || 'customer@email.com',
